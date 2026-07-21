@@ -1,3 +1,5 @@
+export const runtime = 'edge';
+
 const SHEET_ID = '1nHoGwVeoKe7p64ko6nkwWVY-svuonzBH936pbdv1t5A';
 
 function slugify(text) {
