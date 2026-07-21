@@ -1,0 +1,7 @@
+{
+  "framework": "nextjs",
+  "rewrites": [
+    { "source": "/video/:slug", "destination": "/video/[slug]" },
+    { "source": "/search", "destination": "/" }
+  ]
+}
