@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from "react";
 import Head from "next/head";
 
-export const runtime = 'experimental-edge';
-
 const SHEET_ID = '1nHoGwVeoKe7p64ko6nkwWVY-svuonzBH936pbdv1t5A';
 const PER_PAGE = 30;
 
