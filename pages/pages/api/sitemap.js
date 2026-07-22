@@ -1,7 +1,5 @@
 const SHEET_ID = '1nHoGwVeoKe7p64ko6nkwWVY-svuonzBH936pbdv1t5A';
 
-export const runtime = 'experimental-edge';
-
 function slugify(text) {
   return text.toString().toLowerCase()
     .replace(/\s+/g, '-')
