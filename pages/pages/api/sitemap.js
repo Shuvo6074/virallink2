@@ -9,7 +9,7 @@ function slugify(text) {
     .substring(0, 80);
 }
 
-export default async function handler(req) {
+export async function getServerSideProps({ res }) {
   const siteUrl = 'https://virallink2.site';
 
   const fallbackSitemap = `<?xml version="1.0" encoding="UTF-8"?>
@@ -20,6 +20,8 @@ export default async function handler(req) {
       <priority>1.0</priority>
     </url>
 </urlset>`;
+
+  let sitemap = fallbackSitemap;
 
   try {
     const controller = new AbortController();
@@ -53,7 +55,7 @@ export default async function handler(req) {
       <priority>0.8</priority>
     </url>`).join('');
 
-    const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
+    sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
       <loc>${siteUrl}</loc>
@@ -62,20 +64,20 @@ export default async function handler(req) {
     </url>${urls}
 </urlset>`;
 
-    return new Response(sitemap, {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/xml',
-        'Cache-Control': 'public, s-maxage=600, stale-while-revalidate=3600',
-      },
-    });
+    res.setHeader('Content-Type', 'application/xml');
+    res.setHeader('Cache-Control', 'public, s-maxage=600, stale-while-revalidate=3600');
   } catch (e) {
-    return new Response(fallbackSitemap, {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/xml',
-        'Cache-Control': 'public, s-maxage=60',
-      },
-    });
+    sitemap = fallbackSitemap;
+    res.setHeader('Content-Type', 'application/xml');
+    res.setHeader('Cache-Control', 'public, s-maxage=60');
   }
-        }
+
+  res.write(sitemap);
+  res.end();
+
+  return { props: {} };
+}
+
+export default function Sitemap() {
+  return null;
+}
