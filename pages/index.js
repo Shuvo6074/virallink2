@@ -271,22 +271,9 @@ atOptions = {'key':'${key}','format':'iframe','height':${height},'width':${width
         <title>BD Viral Hub | বাংলাদেশের সেরা ভাইরাল ভিডিও ২০২৬</title>
         <meta name="description" content="BD Viral Hub - বাংলাদেশের সেরা ভাইরাল ভিডিও সাইট। আজকের নতুন ভাইরাল ভিডিও লিংক, TikTok ভাইরাল ক্লিপ, Facebook Reels ভাইরাল, ফানি ভিডিও বিনামূল্যে দেখুন।" />
         <meta name="keywords" content="tiktoker viral video, Bangladesh tiktoker viral video, tiktok viral video bangladesh, বাংলাদেশি ভাইরাল ভিডিও, facebook reels viral bd, funny video bangladesh" />
-        <meta name="google-site-verification" content="XGdM1Gf3FOdKjE7clTPbSFMyv92T7VL8y9Ox5hqCMwE" />
-        <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
-        <meta name="googlebot" content="index, follow" />
-        <meta name="rating" content="adult" />
-        <meta name="rating" content="RTA-5042-1996-1400-1577-RTA" />
-        <link rel="canonical" href="https://virallink2.site/" />
-        <meta property="og:type" content="website" />
         <meta property="og:title" content="BD Viral Hub | বাংলাদেশের সেরা ভাইরাল ভিডিও ২০২৬" />
         <meta property="og:description" content="বাংলাদেশের সেরা ভাইরাল ভিডিও সাইট। TikTok ভাইরাল, Facebook Reels ভাইরাল, ফানি ভিডিও ফ্রিতে দেখুন।" />
         <meta property="og:url" content="https://virallink2.site/" />
-        <meta property="og:site_name" content="BD Viral Hub" />
-        <meta property="og:locale" content="bn_BD" />
-        <meta name="twitter:card" content="summary_large_image" />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
           "@context":"https://schema.org","@type":"WebSite","name":"BD Viral Hub",
           "url":"https://virallink2.site","description":"বাংলাদেশের সেরা ভাইরাল ভিডিও সাইট",
