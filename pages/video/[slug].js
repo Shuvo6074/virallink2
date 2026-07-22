@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import Head from "next/head";
 import { useRouter } from "next/router";
 
-const SHEET_ID = '1nHoGwVeoKe7p64ko6nkwWVY-svuonzBH936pbdv1t5A';
+const SHEET_ID = '1CJU7TtQAvLGwVIrFB4G6uIyDy0m0Uz54kB6ZBpar4zE';
 const SITE_URL = 'https://virallink2.site';
 
 function slugify(text) {
@@ -216,6 +216,10 @@ export default function VideoPage({ video, related }) {
       setLiked(!!l[video.id]);
     } catch(e) {}
 
+    // ── ভিউ কাউন্ট কালেকশন সাময়িকভাবে বন্ধ করা হলো (২০২৬-০৭-২৩)। কোড ডিলিট করা
+    // হয়নি, নিচের পুরো ব্লকটা comment করে রাখা হলো। আবার চালু করতে চাইলে শুধু
+    // /* এবং */ এই দুইটা মার্কার সরিয়ে দিলেই আগের মতো কাজ করবে। ──
+    /*
     // ── ভিউ কাউন্ট: প্রতিবার পেজ খুললে এই ভিডিওর slug একটা Google Form-এ
     // জমা (submit) হয়। এটাই একটা "ভিউ" হিসেবে গণনা হয়। সব ভিজিটরের
     // জমা একই Response Sheet-এ গিয়ে জমা হয়, তাই এটা সবার জন্য COMMON,
@@ -245,6 +249,7 @@ export default function VideoPage({ video, related }) {
         setViews(counts);
       })
       .catch(() => {});
+    */
   }, [video.id]);
 
   // Inject highperformanceformat.com 728x90 banner ads (isolated iframe, runs twice)
@@ -333,6 +338,7 @@ atOptions = {
       <Head>
         <title>{video.title} | BD Viral Hub</title>
         <meta name="description" content={(video.description || video.title) + ' - BD Viral Hub ভাইরাল ভিডিও বাংলাদেশ ২০২৬'} />
+        <meta name="keywords" content={`tiktoker viral video, Bangladesh tiktoker viral video, tiktok viral video bangladesh, ${video.categories.join(', ')}, বাংলাদেশি ভাইরাল ভিডিও`} />
         <meta name="robots" content="index, follow" />
         <meta name="rating" content="adult" />
         <meta name="rating" content="RTA-5042-1996-1400-1577-RTA" />
@@ -384,9 +390,9 @@ atOptions = {
           .related-thumb{position:relative;width:100%;padding-top:56.25%;background:#000;overflow:hidden;}
           .related-thumb img{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;transition:transform 0.3s;}
           .related-card:hover .related-thumb img{transform:scale(1.03);}
-          .related-info{padding:0.6rem;}
-          .related-title-text{font-size:0.85rem;font-weight:600;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.4;margin-bottom:0.4rem;}
-          .related-meta{font-size:0.72rem;color:var(--muted);}
+          .related-info{padding:0.5rem 0.6rem;}
+          .related-title-text{font-size:0.78rem;font-weight:600;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;line-height:1.3;margin-bottom:0.25rem;}
+          .related-meta{font-size:0.7rem;color:var(--muted);}
           .breadcrumb{font-size:0.8rem;color:var(--muted);margin-bottom:1rem;}
           .breadcrumb a{color:var(--muted);text-decoration:none;}
           .breadcrumb a:hover{color:var(--accent);}
@@ -451,7 +457,8 @@ atOptions = {
             <h1 className="video-title-big">{video.title}</h1>
 
             <div className="video-stats-row">
-              <span>👁 {formatNum(views[video.slug] || 0)} views</span>
+              {/* ভিউ কাউন্ট অপশন বন্ধ (২০২৬-০৭-২৩) — জায়গা বাঁচাতে হাইড করা হলো, কোড রাখা হলো কমেন্টে
+              <span>👁 {formatNum(views[video.slug] || 0)} views</span> */}
               <span>❤️ {formatNum(likes[video.id] || 0)} likes</span>
               <span>📁 {video.categories.join(', ')}</span>
               {video.date && <span>📅 {video.date}</span>}
@@ -499,7 +506,7 @@ atOptions = {
                     </div>
                     <div className="related-info">
                       <div className="related-title-text">{v.title}</div>
-                      <div className="related-meta">👁 {formatNum(views[v.slug] || 0)} · {v.categories.join(', ')}</div>
+                      <div className="related-meta">{v.categories.join(', ')}</div>
                     </div>
                   </a>
                 ))}
@@ -532,7 +539,7 @@ atOptions = {
                   </div>
                   <div className="related-info">
                     <div className="related-title-text">{v.title}</div>
-                    <div className="related-meta">👁 {formatNum(views[v.slug] || 0)} · {v.categories.join(', ')}</div>
+                    <div className="related-meta">{v.categories.join(', ')}</div>
                   </div>
                 </a>
               ))}
@@ -565,4 +572,4 @@ atOptions = {
       )}
     </>
   );
-                                                               }
+      }
