@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import Head from "next/head";
 
-const SHEET_ID = '1nHoGwVeoKe7p64ko6nkwWVY-svuonzBH936pbdv1t5A';
+const SHEET_ID = '1CJU7TtQAvLGwVIrFB4G6uIyDy0m0Uz54kB6ZBpar4zE';
 const PER_PAGE = 30;
 
 function slugify(text) {
@@ -40,7 +40,7 @@ function parseCategories(str) {
   return arr.length ? arr : ['General'];
 }
 
-const SHEET_ID_SSR = '1nHoGwVeoKe7p64ko6nkwWVY-svuonzBH936pbdv1t5A';
+const SHEET_ID_SSR = '1CJU7TtQAvLGwVIrFB4G6uIyDy0m0Uz54kB6ZBpar4zE';
 
 // ⚠️ [slug].js পেজে ব্যবহৃত একই Google Form Response Sheet, ভিউ কাউন্ট
 // একই জায়গা থেকে পড়ার জন্য (যাতে হোমপেজ ও ভিডিও পেজে সংখ্যা মেলে)
@@ -143,6 +143,10 @@ export default function Home({ initialVideos }) {
   }, []);
 
   useEffect(() => {
+    // ── ভিউ কাউন্ট ডিসপ্লে সাময়িকভাবে বন্ধ করা হলো (২০২৬-০৭-২৩)। কোড ডিলিট করা
+    // হয়নি, নিচের ব্লকটা comment করে রাখা হলো। আবার চালু করতে চাইলে শুধু
+    // /* এবং */ এই দুইটা মার্কার সরিয়ে দিলেই আগের মতো কাজ করবে। ──
+    /*
     // ── ভিউ কাউন্ট: [slug].js পেজের মতোই একই Response Sheet থেকে
     // সব ভিডিওর ভিউ (slug অনুযায়ী গোনা) নিয়ে আসা হচ্ছে, যাতে হোমপেজের
     // কার্ডেও ভিডিও পেজের সাথে মিলিয়ে সঠিক, common ভিউ সংখ্যা দেখায় ──
@@ -158,6 +162,7 @@ export default function Home({ initialVideos }) {
         setViews(counts);
       })
       .catch(() => {});
+    */
   }, []);
 
   // ── পপআন্ডার এড ইনজেক্ট (আগে এখানে স্মার্টলিংক ছিল, সরিয়ে এইটা বসানো হলো) ──
@@ -265,6 +270,8 @@ atOptions = {'key':'${key}','format':'iframe','height':${height},'width':${width
       <Head>
         <title>BD Viral Hub | বাংলাদেশের সেরা ভাইরাল ভিডিও ২০২৬</title>
         <meta name="description" content="BD Viral Hub - বাংলাদেশের সেরা ভাইরাল ভিডিও সাইট। আজকের নতুন ভাইরাল ভিডিও লিংক, TikTok ভাইরাল ক্লিপ, Facebook Reels ভাইরাল, ফানি ভিডিও বিনামূল্যে দেখুন।" />
+        <meta name="keywords" content="tiktoker viral video, Bangladesh tiktoker viral video, tiktok viral video bangladesh, বাংলাদেশি ভাইরাল ভিডিও, facebook reels viral bd, funny video bangladesh" />
+        <meta name="google-site-verification" content="XGdM1Gf3FOdKjE7clTPbSFMyv92T7VL8y9Ox5hqCMwE" />
         <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
         <meta name="googlebot" content="index, follow" />
         <meta name="rating" content="adult" />
@@ -406,7 +413,8 @@ atOptions = {'key':'${key}','format':'iframe','height':${height},'width':${width
                     <div className="card-title">{v.title}</div>
                     <div className="card-meta">
                       <span className="cat-badge">{v.categories.join(', ')}</span>
-                      <span>👁 {formatNum(views[v.slug] || 0)}</span>
+                      {/* ভিউ কাউন্ট অপশন বন্ধ (২০২৬-০৭-২৩) — জায়গা বাঁচাতে হাইড করা হলো, কোড রাখা হলো কমেন্টে
+                      <span>👁 {formatNum(views[v.slug] || 0)}</span> */}
                     </div>
                   </div>
                 </a>
