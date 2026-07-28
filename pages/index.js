@@ -110,38 +110,6 @@ export default function Home({ initialVideos }) {
   const [error, setError]           = useState('');
   const [views, setViews]           = useState({});
 
-  // ── ফুলস্ক্রিন স্মার্টলিংক ওভারলে: পেজে ঢোকার ১৫ সেকেন্ড পর ওপেন হবে,
-  // ৯ সেকেন্ড কাউন্টডাউন শেষে ক্রস (✕) বাটন আসবে, বন্ধ করা যাবে ──
-  const SMARTLINK_URL_HOME = 'https://www.effectivecpmnetwork.com/uaq4j6p6s0?key=efcef79acf92e1461afbfa49071f2669';
-  const [showSmartOverlay, setShowSmartOverlay] = useState(false);
-  const [canCloseSmartOverlay, setCanCloseSmartOverlay] = useState(false);
-  const [closeCountdown, setCloseCountdown] = useState(9);
-
-  function closeSmartOverlay() {
-    setShowSmartOverlay(false);
-  }
-
-  useEffect(() => {
-    const openTimer = setTimeout(() => {
-      setShowSmartOverlay(true);
-      setCanCloseSmartOverlay(false);
-      setCloseCountdown(9);
-
-      const countdownInterval = setInterval(() => {
-        setCloseCountdown(prev => {
-          if (prev <= 1) {
-            clearInterval(countdownInterval);
-            setCanCloseSmartOverlay(true);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }, 15000);
-
-    return () => clearTimeout(openTimer);
-  }, []);
-
   useEffect(() => {
     // ── ভিউ কাউন্ট ডিসপ্লে সাময়িকভাবে বন্ধ করা হলো (২০২৬-০৭-২৩)। কোড ডিলিট করা
     // হয়নি, নিচের ব্লকটা comment করে রাখা হলো। আবার চালু করতে চাইলে শুধু
@@ -173,6 +141,42 @@ export default function Home({ initialVideos }) {
     script.src = 'https://pl29731380.effectivecpmnetwork.com/e1/1a/dd/e11add4186ad924a2c35518025bbb7c2.js';
     script.async = true;
     document.body.appendChild(script);
+  }, []);
+
+  // ── TwinRed Interstitial: হোমপেজে ঢোকার ২০ সেকেন্ড পর প্রথমবার, তারপর
+  // প্রতি ২ মিনিট পর পর আবার দেখাবে (Zone: BDViralHub-Interstitial-Timed) ──
+  useEffect(() => {
+    function loadInterstitialAd() {
+      const oldIns = document.getElementById('tr-interstitial-ins');
+      if (oldIns) oldIns.remove();
+
+      const ins = document.createElement('ins');
+      ins.id = 'tr-interstitial-ins';
+      ins.setAttribute('data-tr-zone', '01KYKDMTWP2FJJEYV7CWHREEG6');
+
+      const script = document.createElement('script');
+      script.type = 'text/javascript';
+      script.async = true;
+      script.src = 'https://s.ad.twinrdengine.com/adlib.js';
+
+      ins.appendChild(script);
+      document.body.appendChild(ins);
+    }
+
+    const firstTimer = setTimeout(() => {
+      loadInterstitialAd();
+    }, 20000);
+
+    let repeatInterval;
+    const startRepeat = setTimeout(() => {
+      repeatInterval = setInterval(loadInterstitialAd, 120000);
+    }, 20000);
+
+    return () => {
+      clearTimeout(firstTimer);
+      clearTimeout(startRepeat);
+      if (repeatInterval) clearInterval(repeatInterval);
+    };
   }, []);
 
   // ── highperformanceformat.com banner ads inject ──
@@ -426,18 +430,6 @@ atOptions = {'key':'${key}','format':'iframe','height':${height},'width':${width
           </div>
         </div>
       </footer>
-
-      {/* ফুলস্ক্রিন স্মার্টলিংক ওভারলে — পেজে ঢোকার ১৫ সেকেন্ড পর */}
-      {showSmartOverlay && (
-        <div className="smart-overlay">
-          <iframe src={SMARTLINK_URL_HOME} title="ad" />
-          {canCloseSmartOverlay ? (
-            <div className="smart-overlay-close" onClick={closeSmartOverlay}>✕</div>
-          ) : (
-            <div className="smart-overlay-close smart-overlay-countdown">{closeCountdown}</div>
-          )}
-        </div>
-      )}
     </>
   );
-    }
+      }
