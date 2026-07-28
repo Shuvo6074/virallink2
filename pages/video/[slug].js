@@ -137,7 +137,81 @@ export default function VideoPage({ video, related }) {
 
   const [iframeStarted, setIframeStarted] = useState(false); // Google Drive/archive.org embed-এর ক্ষেত্রে থাম্বনেইলে ক্লিক করার আগ পর্যন্ত iframe লোড হবে না
 
-  const SMARTLINK_URL = 'https://www.effectivecpmnetwork.com/z5yped96?key=51bf89de175c32426c4db7dc8e8c51d9';
+  const SMARTLINK_URL = 'https://www.effectivecpmnetwork.com/hzn588p39q?key=c22e2da4de74dbe9769bd7bcc477bb63';
+
+  // ── TwinRed Interstitial: ভিডিও পেজে ঢোকার ১ মিনিট পর প্রথমবার, তারপর
+  // প্রতি ২ মিনিট পর পর (Zone: BDViralHub-Interstitial-Timed) ──
+  useEffect(() => {
+    function loadInterstitialAd() {
+      const oldIns = document.getElementById('tr-interstitial-ins');
+      if (oldIns) oldIns.remove();
+
+      const ins = document.createElement('ins');
+      ins.id = 'tr-interstitial-ins';
+      ins.setAttribute('data-tr-zone', '01KYKDMTWP2FJJEYV7CWHREEG6');
+
+      const script = document.createElement('script');
+      script.type = 'text/javascript';
+      script.async = true;
+      script.src = 'https://s.ad.twinrdengine.com/adlib.js';
+
+      ins.appendChild(script);
+      document.body.appendChild(ins);
+    }
+
+    const firstTimer = setTimeout(() => {
+      loadInterstitialAd();
+    }, 60000);
+
+    let repeatInterval;
+    const startRepeat = setTimeout(() => {
+      repeatInterval = setInterval(loadInterstitialAd, 120000);
+    }, 60000);
+
+    return () => {
+      clearTimeout(firstTimer);
+      clearTimeout(startRepeat);
+      if (repeatInterval) clearInterval(repeatInterval);
+    };
+  }, [video.id]);
+
+  // ── TwinRed Outstream: পেজে ঢোকার সাথে সাথে দেখাবে, ইউজার ✕ চাপলে বন্ধ
+  // হয়ে যাবে, বন্ধ হওয়ার ৩০ সেকেন্ড পর ইউজার এখনো পেজে থাকলে আবার দেখাবে
+  // (Zone: BDViralHub-Outstream-VideoPage) ──
+  const [showOutstream, setShowOutstream] = useState(false);
+  const outstreamReopenTimer = useRef(null);
+
+  useEffect(() => {
+    setShowOutstream(true);
+    return () => {
+      if (outstreamReopenTimer.current) clearTimeout(outstreamReopenTimer.current);
+    };
+  }, [video.id]);
+
+  useEffect(() => {
+    if (!showOutstream) return;
+    const container = document.getElementById('tr-outstream-container');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const ins = document.createElement('ins');
+    ins.setAttribute('data-tr-zone', '01KYKE1XT5RM7KAZG2ZFC7TR2D');
+
+    const script = document.createElement('script');
+    script.type = 'text/javascript';
+    script.async = true;
+    script.src = 'https://s.ad.twinrdengine.com/adlib.js';
+
+    ins.appendChild(script);
+    container.appendChild(ins);
+  }, [showOutstream]);
+
+  function closeOutstream() {
+    setShowOutstream(false);
+    outstreamReopenTimer.current = setTimeout(() => {
+      setShowOutstream(true);
+    }, 30000);
+  }
 
   function handleOverlayClick() {
     window.open(SMARTLINK_URL, '_blank');
@@ -147,50 +221,6 @@ export default function VideoPage({ video, related }) {
     // একই ক্লিকে স্মার্টলিংক ওপেন হওয়ার পাশাপাশি ভিডিও/iframe-ও সাথে সাথে
     // চলা শুরু করবে। ──
   }
-
-  // ── ফুলস্ক্রিন স্মার্টলিংক ওভারলে (নতুন): পেজে ঢোকার ৫ সেকেন্ড পর প্রথমবার
-  // ওপেন হবে, ভিতরে ৯ সেকেন্ড পর্যন্ত ক্রস (✕) বাটন হাইড থাকবে, তারপর দেখা
-  // যাবে এবং বন্ধ করা যাবে। এরপর প্রতি ২ মিনিট পর পর আবার ওপেন হবে। ──
-  const SMARTLINK_URL_2 = 'https://www.effectivecpmnetwork.com/gz85f22eg?key=cac24b6704b3e352e06cca3da83136fd';
-  const [showSmartOverlay, setShowSmartOverlay] = useState(false);
-  const [canCloseSmartOverlay, setCanCloseSmartOverlay] = useState(false);
-  const [closeCountdown, setCloseCountdown] = useState(9);
-
-  function openSmartOverlay() {
-    setShowSmartOverlay(true);
-    setCanCloseSmartOverlay(false);
-    setCloseCountdown(9);
-
-    const countdownInterval = setInterval(() => {
-      setCloseCountdown(prev => {
-        if (prev <= 1) {
-          clearInterval(countdownInterval);
-          setCanCloseSmartOverlay(true);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  }
-
-  function closeSmartOverlay() {
-    setShowSmartOverlay(false);
-  }
-
-  useEffect(() => {
-    const firstTimer = setTimeout(() => {
-      openSmartOverlay();
-    }, 5000);
-
-    const repeatInterval = setInterval(() => {
-      openSmartOverlay();
-    }, 120000);
-
-    return () => {
-      clearTimeout(firstTimer);
-      clearInterval(repeatInterval);
-    };
-  }, []);
 
   function handleRelatedClick(e, slug) {
     e.preventDefault();
@@ -280,12 +310,32 @@ atOptions = {
       return iframe;
     }
 
-    ['ad-banner-bottom-1', 'ad-banner-bottom-2', 'ad-banner-mid'].forEach(id => {
+    ['ad-banner-mid'].forEach(id => {
       const container = document.getElementById(id);
       if (!container || container.dataset.loaded) return;
       container.dataset.loaded = 'true';
       container.appendChild(buildAdIframe('408f7fe8d5566eee24a05d83101d2638', 300, 250));
     });
+  }, [video.id]);
+
+  // ── নেটিভ ব্যানার অ্যাড (effectivecpmnetwork) — related videos-এর নিচে,
+  // আগে এখানে দুইটা 300x250 highperformanceformat ব্যানার ছিল, সেগুলো
+  // সরিয়ে এই একটা নেটিভ অ্যাড বসানো হলো ──
+  useEffect(() => {
+    const container = document.getElementById('native-banner-related');
+    if (!container || container.dataset.loaded) return;
+    container.dataset.loaded = 'true';
+
+    const adDiv = document.createElement('div');
+    adDiv.id = 'container-e474628fdcec06f52100e0b84b3fa759';
+
+    const script = document.createElement('script');
+    script.async = true;
+    script.setAttribute('data-cfasync', 'false');
+    script.src = 'https://pl30569233.effectivecpmnetwork.com/e474628fdcec06f52100e0b84b3fa759/invoke.js';
+
+    container.appendChild(adDiv);
+    container.appendChild(script);
   }, [video.id]);
 
   function toggleLike() {
@@ -403,10 +453,9 @@ atOptions = {
           .iframe-click-gate img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0.75;}
           .iframe-click-gate .play-btn-icon{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:64px;height:64px;border-radius:50%;background:rgba(255,61,61,0.9);display:flex;align-items:center;justify-content:center;color:#fff;font-size:24px;box-shadow:0 4px 16px rgba(0,0,0,0.5);}
           .video-overlay{position:absolute;inset:0;width:100%;height:100%;background:transparent;cursor:pointer;z-index:10;}
-          .smart-overlay{position:fixed;inset:0;width:100vw;height:100vh;background:#000;z-index:999999;}
-          .smart-overlay iframe{position:absolute;inset:0;width:100%;height:100%;border:none;background:#000;}
-          .smart-overlay-close{position:absolute;top:14px;right:14px;width:40px;height:40px;border-radius:50%;background:rgba(0,0,0,0.7);border:1px solid rgba(255,255,255,0.4);color:#fff;font-size:20px;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:2;}
-          .smart-overlay-countdown{cursor:default;font-size:16px;font-weight:600;opacity:0.85;}
+          .tr-outstream-popup{position:fixed;bottom:20px;right:20px;width:300px;max-width:90vw;z-index:9999;border-radius:10px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.25);background:#000;animation:trSlideUp 0.4s ease-out;}
+          .tr-outstream-close{position:absolute;top:4px;right:4px;z-index:2;background:rgba(0,0,0,0.6);color:#fff;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:12px;line-height:1;}
+          @keyframes trSlideUp{from{transform:translateY(100%);opacity:0;}to{transform:translateY(0);opacity:1;}}
         `}</style>
       </Head>
 
@@ -547,27 +596,16 @@ atOptions = {
           </div>
         </div>
 
-        {/* 300x250 Banner Ad - below related videos */}
-        <div style={{display:'flex',justifyContent:'center',margin:'1rem 0'}}>
-          <div className="ad-banner-slot" id="ad-banner-bottom-1"></div>
-        </div>
-
-        {/* 300x250 Banner Ad - second one below related videos */}
-        <div style={{display:'flex',justifyContent:'center',margin:'1rem 0'}}>
-          <div className="ad-banner-slot" id="ad-banner-bottom-2"></div>
-        </div>
+        {/* Native Banner Ad - below related videos (effectivecpmnetwork) */}
+        <div style={{display:'flex',justifyContent:'center',margin:'1rem 0'}} id="native-banner-related"></div>
 
       </div>
 
-      {/* ফুলস্ক্রিন স্মার্টলিংক ওভারলে — ঢোকার ৫ সেকেন্ড পর প্রথমবার, তারপর প্রতি ২ মিনিটে */}
-      {showSmartOverlay && (
-        <div className="smart-overlay">
-          <iframe src={SMARTLINK_URL_2} title="ad" />
-          {canCloseSmartOverlay ? (
-            <div className="smart-overlay-close" onClick={closeSmartOverlay}>✕</div>
-          ) : (
-            <div className="smart-overlay-close smart-overlay-countdown">{closeCountdown}</div>
-          )}
+      {/* TwinRed Outstream — নিচ-ডানকোণে নোটিফিকেশনের মতো, শুধু অ্যাডের সাইজ নিয়ে */}
+      {showOutstream && (
+        <div className="tr-outstream-popup">
+          <button onClick={closeOutstream} className="tr-outstream-close" aria-label="Close ad">✕</button>
+          <div id="tr-outstream-container"></div>
         </div>
       )}
     </>
