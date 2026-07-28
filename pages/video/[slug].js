@@ -256,7 +256,10 @@ export default function VideoPage({ video, related }) {
     // real সংখ্যা — localStorage-এর মতো নিজের ব্রাউজারে সীমাবদ্ধ না। ──
     try {
       const formData = new URLSearchParams();
-      formData.append(VIEW_FORM_ENTRY, video.slug);
+      // ── সাইট আইডেন্টিফায়ার প্রিফিক্স 'v2-' যোগ করা হলো, যাতে
+      // virallink2.site আর bd-viral-hub-এর ভিউ একই sheet-এ গিয়েও
+      // একে অপরের সাথে মিশে না যায় ──
+      formData.append(VIEW_FORM_ENTRY, `v2-${video.slug}`);
       fetch(VIEW_FORM_URL, {
         method: 'POST',
         mode: 'no-cors', // Google Form নিজে থেকেই এটা require করে, রেসপন্স পড়া যায় না কিন্তু submit ঠিকই হয়
@@ -273,8 +276,12 @@ export default function VideoPage({ video, related }) {
         const json = JSON.parse(text.substring(47, text.length - 2));
         const counts = {};
         json.table.rows.forEach(row => {
-          const s = row.c[1]?.v; // কলাম B = slug
-          if (s) counts[s] = (counts[s] || 0) + 1;
+          const s = row.c[1]?.v; // কলাম B = slug (prefix সহ, যেমন v2-xxxx)
+          // শুধু virallink2.site-এর নিজের এন্ট্রি গোনা হচ্ছে, prefix বাদ দিয়ে
+          if (s && s.startsWith('v2-')) {
+            const key = s.slice(3);
+            counts[key] = (counts[key] || 0) + 1;
+          }
         });
         setViews(counts);
       })
@@ -349,7 +356,7 @@ atOptions = {
   function shareVideo() {
     const url = `${SITE_URL}/video/${video.slug}`;
     if (typeof navigator !== 'undefined' && navigator.share) {
-      navigator.share({ title: video.title + ' | BD Viral Hub', url });
+      navigator.share({ title: video.title + ' | ViralLink BD', url });
     } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
       navigator.clipboard.writeText(url).then(() => alert('লিংক কপি হয়েছে!'));
     }
@@ -370,7 +377,7 @@ atOptions = {
     "uploadDate": video.date || new Date().toISOString().split('T')[0],
     "contentUrl": video.videoUrl,
     "embedUrl": pageUrl,
-    "publisher": { "@type": "Organization", "name": "BD Viral Hub", "url": SITE_URL }
+    "publisher": { "@type": "Organization", "name": "ViralLink BD", "url": SITE_URL }
   };
 
   const breadcrumbSchema = {
@@ -386,19 +393,19 @@ atOptions = {
   return (
     <>
       <Head>
-        <title>{video.title} | BD Viral Hub</title>
-        <meta name="description" content={(video.description || video.title) + ' - BD Viral Hub ভাইরাল ভিডিও বাংলাদেশ ২০২৬'} />
+        <title>{video.title} | ViralLink BD</title>
+        <meta name="description" content={(video.description || video.title) + ' - ViralLink BD ভাইরাল ভিডিও বাংলাদেশ ২০২৬'} />
         <meta name="keywords" content={`tiktoker viral video, Bangladesh tiktoker viral video, tiktok viral video bangladesh, ${video.categories.join(', ')}, বাংলাদেশি ভাইরাল ভিডিও`} />
         <meta name="robots" content="index, follow" />
         <meta name="rating" content="adult" />
         <meta name="rating" content="RTA-5042-1996-1400-1577-RTA" />
         <link rel="canonical" href={pageUrl} />
-        <meta property="og:title" content={video.title + ' | BD Viral Hub'} />
+        <meta property="og:title" content={video.title + ' | ViralLink BD'} />
         <meta property="og:description" content={video.description || video.title} />
         <meta property="og:url" content={pageUrl} />
         <meta property="og:type" content="video.other" />
         <meta property="og:image" content={video.thumbnail} />
-        <meta property="og:site_name" content="BD Viral Hub" />
+        <meta property="og:site_name" content="ViralLink BD" />
         <meta name="twitter:card" content="summary_large_image" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
@@ -461,7 +468,7 @@ atOptions = {
 
       <header>
         <div className="header-inner">
-          <a className="logo" href="/">BD Viral<span>Hub</span></a>
+          <a className="logo" href="/">ViralLink<span>BD</span></a>
         </div>
       </header>
 
@@ -610,4 +617,4 @@ atOptions = {
       )}
     </>
   );
-      }
+                    }
