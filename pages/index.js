@@ -124,8 +124,12 @@ export default function Home({ initialVideos }) {
         const json = JSON.parse(text.substring(47, text.length - 2));
         const counts = {};
         json.table.rows.forEach(row => {
-          const s = row.c[1]?.v; // কলাম B = slug
-          if (s) counts[s] = (counts[s] || 0) + 1;
+          const s = row.c[1]?.v; // কলাম B = slug (prefix সহ, যেমন v2-xxxx)
+          // শুধু virallink2.site-এর নিজের এন্ট্রি গোনা হচ্ছে, prefix বাদ দিয়ে
+          if (s && s.startsWith('v2-')) {
+            const key = s.slice(3);
+            counts[key] = (counts[key] || 0) + 1;
+          }
         });
         setViews(counts);
       })
@@ -272,22 +276,23 @@ atOptions = {'key':'${key}','format':'iframe','height':${height},'width':${width
   return (
     <>
       <Head>
-        <title>BD Viral Hub | বাংলাদেশের সেরা ভাইরাল ভিডিও ২০২৬</title>
-        <meta name="description" content="BD Viral Hub - বাংলাদেশের সেরা ভাইরাল ভিডিও সাইট। আজকের নতুন ভাইরাল ভিডিও লিংক, TikTok ভাইরাল ক্লিপ, Facebook Reels ভাইরাল, ফানি ভিডিও বিনামূল্যে দেখুন।" />
+        <title>ViralLink BD | আজকের ভাইরাল ভিডিও বাংলাদেশ ২০২৬</title>
+        <meta name="description" content="ViralLink BD - বাংলাদেশের ভাইরাল ভিডিও নেটওয়ার্ক। প্রতিদিনের ট্রেন্ডিং TikTok ক্লিপ, Facebook Reels, ফানি ভিডিও এক জায়গায় দেখুন।" />
         <meta name="keywords" content="tiktoker viral video, Bangladesh tiktoker viral video, tiktok viral video bangladesh, বাংলাদেশি ভাইরাল ভিডিও, facebook reels viral bd, funny video bangladesh" />
-        <meta property="og:title" content="BD Viral Hub | বাংলাদেশের সেরা ভাইরাল ভিডিও ২০২৬" />
-        <meta property="og:description" content="বাংলাদেশের সেরা ভাইরাল ভিডিও সাইট। TikTok ভাইরাল, Facebook Reels ভাইরাল, ফানি ভিডিও ফ্রিতে দেখুন।" />
+        <meta property="og:title" content="ViralLink BD | আজকের ভাইরাল ভিডিও বাংলাদেশ ২০২৬" />
+        <meta property="og:description" content="বাংলাদেশের ভাইরাল ভিডিও নেটওয়ার্ক। ট্রেন্ডিং TikTok ক্লিপ, Facebook Reels, ফানি ভিডিও ফ্রিতে দেখুন।" />
+        <meta property="og:site_name" content="ViralLink BD" />
         <meta property="og:url" content="https://virallink2.site/" />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
-          "@context":"https://schema.org","@type":"WebSite","name":"BD Viral Hub",
-          "url":"https://virallink2.site","description":"বাংলাদেশের সেরা ভাইরাল ভিডিও সাইট",
+          "@context":"https://schema.org","@type":"WebSite","name":"ViralLink BD",
+          "url":"https://virallink2.site","description":"বাংলাদেশের ভাইরাল ভিডিও নেটওয়ার্ক",
           "potentialAction":{"@type":"SearchAction","target":"https://virallink2.site/search?q={search_term_string}","query-input":"required name=search_term_string"}
         })}} />
       </Head>
 
       <header>
         <div className="header-inner">
-          <a className="logo" href="/">BD Viral<span>Hub</span></a>
+          <a className="logo" href="/">ViralLink<span>BD</span></a>
           <div className="search-bar">
             <input type="text" placeholder="ভিডিও খুঁজুন..." value={searchQ} onChange={e => handleSearch(e.target.value)} />
             <button>🔍</button>
@@ -402,8 +407,8 @@ atOptions = {'key':'${key}','format':'iframe','height':${height},'width':${width
         <div className="footer-inner">
           <div className="footer-grid">
             <div>
-              <h2>BD Viral Hub</h2>
-              <p>বাংলাদেশের সেরা ভাইরাল ভিডিও প্ল্যাটফর্ম। প্রতিদিন নতুন TikTok ভাইরাল ক্লিপ, Facebook Reels ভাইরাল, ফানি ভিডিও বিনামূল্যে দেখুন।</p>
+              <h2>ViralLink BD</h2>
+              <p>বাংলাদেশের ভাইরাল ভিডিও নেটওয়ার্ক। প্রতিদিন নতুন TikTok ক্লিপ, Facebook Reels, ফানি ভিডিও বিনামূল্যে দেখুন।</p>
             </div>
             <div>
               <h3>ভিডিও ক্যাটাগরি</h3>
@@ -426,10 +431,10 @@ atOptions = {'key':'${key}','format':'iframe','height':${height},'width':${width
             </div>
           </div>
           <div className="footer-bottom">
-            <p>© 2026 BD Viral Hub | বাংলাদেশের সেরা ভাইরাল ভিডিও সাইট</p>
+            <p>© 2026 ViralLink BD | বাংলাদেশের ভাইরাল ভিডিও নেটওয়ার্ক</p>
           </div>
         </div>
       </footer>
     </>
   );
-      }
+    }
