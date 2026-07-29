@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import Head from "next/head";
 import { useRouter } from "next/router";
 
@@ -18,6 +18,47 @@ function formatNum(n) {
   if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
   if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
   return n.toString();
+}
+
+// ── Google Sheet-এ সেল "Date" টাইপ হলে gviz API সেটা প্লেইন টেক্সট না দিয়ে
+// "Date(2026,6,29)" এই অদ্ভুত ফরম্যাটে পাঠায় (মাস 0-based, তাই 6 = জুলাই)।
+// আবার তুমি যদি হাতে "29/07/2026" (DD/MM/YYYY) লেখো, সেটা প্লেইন টেক্সট
+// থাকলে সাধারণ new Date() দিয়ে ভুল পড়ে (মাস ভেবে মাস>12 হওয়ায় Invalid
+// Date হয়ে যায়) — এই ফাংশন তিন ধরনের ফরম্যাটই ঠিকভাবে পার্স করে। ──
+function parseSheetDate(raw) {
+  if (!raw) return null;
+  if (typeof raw !== 'string') return null;
+
+  // ১) Sheet-এর নিজস্ব Date অবজেক্ট ফরম্যাট: Date(2026,6,29)
+  let m = raw.match(/^Date\((\d+),(\d+),(\d+)/);
+  if (m) return new Date(Number(m[1]), Number(m[2]), Number(m[3]));
+
+  // ২) হাতে লেখা DD/MM/YYYY বা DD-MM-YYYY (তোমার Sheet-এর মতো)
+  m = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (m) return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+
+  // ৩) YYYY-MM-DD (ISO ফরম্যাট)
+  const d = new Date(raw);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+// ── "কতদিন আগে আপলোড হয়েছে" — Sheet-এর কলাম E (date)-এ তারিখ থাকলে
+// সেটা থেকে "৩ দিন আগে" ইত্যাদি হিসাব করে ──
+function timeAgo(dateStr) {
+  const then = parseSheetDate(dateStr);
+  if (!then) return '';
+  const diffMs  = Date.now() - then.getTime();
+  if (diffMs < 0) return '';
+  const diffMin = Math.floor(diffMs / 60000);
+  const diffHr  = Math.floor(diffMin / 60);
+  const diffDay = Math.floor(diffHr / 24);
+  const diffMon = Math.floor(diffDay / 30);
+  const diffYr  = Math.floor(diffDay / 365);
+  if (diffMin < 60) return diffMin <= 1 ? 'কিছুক্ষণ আগে' : `${diffMin} মিনিট আগে`;
+  if (diffHr < 24)  return `${diffHr} ঘণ্টা আগে`;
+  if (diffDay < 30) return `${diffDay} দিন আগে`;
+  if (diffMon < 12) return `${diffMon} মাস আগে`;
+  return `${diffYr} বছর আগে`;
 }
 
 // ── থাম্বনেইল ফিক্স (আপডেট): index.js-এর মতোই — postimg.cc লিংকের জন্য
@@ -139,80 +180,6 @@ export default function VideoPage({ video, related }) {
 
   const SMARTLINK_URL = 'https://www.effectivecpmnetwork.com/hzn588p39q?key=c22e2da4de74dbe9769bd7bcc477bb63';
 
-  // ── TwinRed Interstitial: ভিডিও পেজে ঢোকার ১ মিনিট পর প্রথমবার, তারপর
-  // প্রতি ২ মিনিট পর পর (Zone: BDViralHub-Interstitial-Timed) ──
-  useEffect(() => {
-    function loadInterstitialAd() {
-      const oldIns = document.getElementById('tr-interstitial-ins');
-      if (oldIns) oldIns.remove();
-
-      const ins = document.createElement('ins');
-      ins.id = 'tr-interstitial-ins';
-      ins.setAttribute('data-tr-zone', '01KYKDMTWP2FJJEYV7CWHREEG6');
-
-      const script = document.createElement('script');
-      script.type = 'text/javascript';
-      script.async = true;
-      script.src = 'https://s.ad.twinrdengine.com/adlib.js';
-
-      ins.appendChild(script);
-      document.body.appendChild(ins);
-    }
-
-    const firstTimer = setTimeout(() => {
-      loadInterstitialAd();
-    }, 60000);
-
-    let repeatInterval;
-    const startRepeat = setTimeout(() => {
-      repeatInterval = setInterval(loadInterstitialAd, 120000);
-    }, 60000);
-
-    return () => {
-      clearTimeout(firstTimer);
-      clearTimeout(startRepeat);
-      if (repeatInterval) clearInterval(repeatInterval);
-    };
-  }, [video.id]);
-
-  // ── TwinRed Outstream: পেজে ঢোকার সাথে সাথে দেখাবে, ইউজার ✕ চাপলে বন্ধ
-  // হয়ে যাবে, বন্ধ হওয়ার ৩০ সেকেন্ড পর ইউজার এখনো পেজে থাকলে আবার দেখাবে
-  // (Zone: BDViralHub-Outstream-VideoPage) ──
-  const [showOutstream, setShowOutstream] = useState(false);
-  const outstreamReopenTimer = useRef(null);
-
-  useEffect(() => {
-    setShowOutstream(true);
-    return () => {
-      if (outstreamReopenTimer.current) clearTimeout(outstreamReopenTimer.current);
-    };
-  }, [video.id]);
-
-  useEffect(() => {
-    if (!showOutstream) return;
-    const container = document.getElementById('tr-outstream-container');
-    if (!container) return;
-    container.innerHTML = '';
-
-    const ins = document.createElement('ins');
-    ins.setAttribute('data-tr-zone', '01KYKE1XT5RM7KAZG2ZFC7TR2D');
-
-    const script = document.createElement('script');
-    script.type = 'text/javascript';
-    script.async = true;
-    script.src = 'https://s.ad.twinrdengine.com/adlib.js';
-
-    ins.appendChild(script);
-    container.appendChild(ins);
-  }, [showOutstream]);
-
-  function closeOutstream() {
-    setShowOutstream(false);
-    outstreamReopenTimer.current = setTimeout(() => {
-      setShowOutstream(true);
-    }, 30000);
-  }
-
   function handleOverlayClick() {
     window.open(SMARTLINK_URL, '_blank');
     setShowOverlay(false);
@@ -246,10 +213,6 @@ export default function VideoPage({ video, related }) {
       setLiked(!!l[video.id]);
     } catch(e) {}
 
-    // ── ভিউ কাউন্ট কালেকশন সাময়িকভাবে বন্ধ করা হলো (২০২৬-০৭-২৩)। কোড ডিলিট করা
-    // হয়নি, নিচের পুরো ব্লকটা comment করে রাখা হলো। আবার চালু করতে চাইলে শুধু
-    // /* এবং */ এই দুইটা মার্কার সরিয়ে দিলেই আগের মতো কাজ করবে। ──
-    /*
     // ── ভিউ কাউন্ট: প্রতিবার পেজ খুললে এই ভিডিওর slug একটা Google Form-এ
     // জমা (submit) হয়। এটাই একটা "ভিউ" হিসেবে গণনা হয়। সব ভিজিটরের
     // জমা একই Response Sheet-এ গিয়ে জমা হয়, তাই এটা সবার জন্য COMMON,
@@ -268,25 +231,25 @@ export default function VideoPage({ video, related }) {
       }).catch(() => {});
     } catch(e) {}
 
-    // Response Sheet থেকে সব ভিডিওর মোট ভিউ (কতবার প্রতিটা slug জমা
-    // পড়েছে) গুনে আনা — homepage/related section-এ real সংখ্যা দেখানোর জন্য
-    fetch(`https://docs.google.com/spreadsheets/d/${VIEW_RESPONSES_SHEET_ID}/gviz/tq?tqx=out:json`)
+    // ── Apps Script-এর তৈরি "Summary" শিট থেকে ভিউ কাউন্ট পড়া হচ্ছে (fast) —
+    // পুরো Response Sheet না পড়ে শুধু slug-অনুযায়ী আগে থেকেই গোনা সংখ্যাগুলো
+    // পড়া হচ্ছে, তাই ভিউ যতই বাড়ুক পেজ লোড ধীর হবে না ──
+    fetch(`https://docs.google.com/spreadsheets/d/${VIEW_RESPONSES_SHEET_ID}/gviz/tq?tqx=out:json&sheet=Summary`)
       .then(res => res.text())
       .then(text => {
         const json = JSON.parse(text.substring(47, text.length - 2));
         const counts = {};
         json.table.rows.forEach(row => {
-          const s = row.c[1]?.v; // কলাম B = slug (prefix সহ, যেমন v2-xxxx)
+          const s = row.c[0]?.v; // কলাম A = slug (prefix সহ, যেমন v2-xxxx)
+          const c = row.c[1]?.v; // কলাম B = views
           // শুধু virallink2.site-এর নিজের এন্ট্রি গোনা হচ্ছে, prefix বাদ দিয়ে
           if (s && s.startsWith('v2-')) {
-            const key = s.slice(3);
-            counts[key] = (counts[key] || 0) + 1;
+            counts[s.slice(3)] = Number(c) || 0;
           }
         });
         setViews(counts);
       })
       .catch(() => {});
-    */
   }, [video.id]);
 
   // Inject highperformanceformat.com 728x90 banner ads (isolated iframe, runs twice)
@@ -343,6 +306,44 @@ atOptions = {
 
     container.appendChild(adDiv);
     container.appendChild(script);
+  }, [video.id]);
+
+  // ── JuicyAds Native Interstitial (Zone ID: 1123228): ভিডিও পেজে ঢোকার
+  // ১ মিনিট পর প্রথমবার স্ক্রিপ্ট অ্যাক্টিভ হবে, তারপর প্রতি ২ মিনিট পর পর
+  // আবার রিলোড হবে। মনে রাখবে: এই ফরম্যাটটা `data-targets="a"` অনুযায়ী
+  // লিংকে ক্লিক করলে ট্রিগার হওয়ার জন্য বানানো, তাই স্ক্রিপ্ট "লোড" হওয়া
+  // মানেই popup দেখা যাবে তা নাও হতে পারে — ইউজার এর ভিতরে কোনো লিংকে
+  // ক্লিক করলেই এটা কার্যকর হবে। ──
+  useEffect(() => {
+    function loadJuicyNativeInterstitial() {
+      const old = document.getElementById('juicyads-native-ads-script');
+      if (old) old.remove();
+      const script = document.createElement('script');
+      script.id = 'juicyads-native-ads-script';
+      script.type = 'text/javascript';
+      script.setAttribute('data-id', 'juicyads-native-ads');
+      script.setAttribute('data-ad-zone', '1123228');
+      script.setAttribute('data-targets', 'a');
+      script.src = 'https://js.juicyads.com/juicyads-native-ads.min.js';
+      document.body.appendChild(script);
+    }
+
+    const firstTimer = setTimeout(() => {
+      loadJuicyNativeInterstitial();
+    }, 60000); // ১ মিনিট পর প্রথমবার
+
+    let repeatInterval;
+    const startRepeat = setTimeout(() => {
+      repeatInterval = setInterval(loadJuicyNativeInterstitial, 120000); // এরপর প্রতি ২ মিনিটে
+    }, 60000);
+
+    return () => {
+      clearTimeout(firstTimer);
+      clearTimeout(startRepeat);
+      if (repeatInterval) clearInterval(repeatInterval);
+      const s = document.getElementById('juicyads-native-ads-script');
+      if (s) s.remove();
+    };
   }, [video.id]);
 
   function toggleLike() {
@@ -460,9 +461,6 @@ atOptions = {
           .iframe-click-gate img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0.75;}
           .iframe-click-gate .play-btn-icon{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:64px;height:64px;border-radius:50%;background:rgba(255,61,61,0.9);display:flex;align-items:center;justify-content:center;color:#fff;font-size:24px;box-shadow:0 4px 16px rgba(0,0,0,0.5);}
           .video-overlay{position:absolute;inset:0;width:100%;height:100%;background:transparent;cursor:pointer;z-index:10;}
-          .tr-outstream-popup{position:fixed;bottom:20px;right:20px;width:300px;max-width:90vw;z-index:9999;border-radius:10px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.25);background:#000;animation:trSlideUp 0.4s ease-out;}
-          .tr-outstream-close{position:absolute;top:4px;right:4px;z-index:2;background:rgba(0,0,0,0.6);color:#fff;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:12px;line-height:1;}
-          @keyframes trSlideUp{from{transform:translateY(100%);opacity:0;}to{transform:translateY(0);opacity:1;}}
         `}</style>
       </Head>
 
@@ -513,11 +511,10 @@ atOptions = {
             <h1 className="video-title-big">{video.title}</h1>
 
             <div className="video-stats-row">
-              {/* ভিউ কাউন্ট অপশন বন্ধ (২০২৬-০৭-২৩) — জায়গা বাঁচাতে হাইড করা হলো, কোড রাখা হলো কমেন্টে
-              <span>👁 {formatNum(views[video.slug] || 0)} views</span> */}
+              <span>👁 {formatNum(views[video.slug] || 0)} views</span>
               <span>❤️ {formatNum(likes[video.id] || 0)} likes</span>
               <span>📁 {video.categories.join(', ')}</span>
-              {video.date && <span>📅 {video.date}</span>}
+              {video.date && <span>📅 {timeAgo(video.date) || video.date}</span>}
             </div>
 
             {video.description && (
@@ -607,14 +604,6 @@ atOptions = {
         <div style={{display:'flex',justifyContent:'center',margin:'1rem 0'}} id="native-banner-related"></div>
 
       </div>
-
-      {/* TwinRed Outstream — নিচ-ডানকোণে নোটিফিকেশনের মতো, শুধু অ্যাডের সাইজ নিয়ে */}
-      {showOutstream && (
-        <div className="tr-outstream-popup">
-          <button onClick={closeOutstream} className="tr-outstream-close" aria-label="Close ad">✕</button>
-          <div id="tr-outstream-container"></div>
-        </div>
-      )}
     </>
   );
-                    }
+      }
