@@ -10,6 +10,7 @@ export default function Document() {
         <link rel="manifest" href="/site.webmanifest" />
 
         <meta name="google-site-verification" content="XGdM1Gf3FOdKjE7clTPbSFMyv92T7VL8y9Ox5hqCMwE" />
+        <meta name="juicyads-site-verification" content="6c7e2eeb94e355ac0b4b104e07d42fbb" />
         <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
         <meta name="googlebot" content="index, follow" />
         <meta name="rating" content="adult" />
