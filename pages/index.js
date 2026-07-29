@@ -19,6 +19,47 @@ function formatNum(n) {
   return n.toString();
 }
 
+// ── Google Sheet-এ সেল "Date" টাইপ হলে gviz API সেটা প্লেইন টেক্সট না দিয়ে
+// "Date(2026,6,29)" এই অদ্ভুত ফরম্যাটে পাঠায় (মাস 0-based, তাই 6 = জুলাই)।
+// আবার তুমি যদি হাতে "29/07/2026" (DD/MM/YYYY) লেখো, সেটা প্লেইন টেক্সট
+// থাকলে সাধারণ new Date() দিয়ে ভুল পড়ে (মাস ভেবে মাস>12 হওয়ায় Invalid
+// Date হয়ে যায়) — এই ফাংশন তিন ধরনের ফরম্যাটই ঠিকভাবে পার্স করে। ──
+function parseSheetDate(raw) {
+  if (!raw) return null;
+  if (typeof raw !== 'string') return null;
+
+  // ১) Sheet-এর নিজস্ব Date অবজেক্ট ফরম্যাট: Date(2026,6,29)
+  let m = raw.match(/^Date\((\d+),(\d+),(\d+)/);
+  if (m) return new Date(Number(m[1]), Number(m[2]), Number(m[3]));
+
+  // ২) হাতে লেখা DD/MM/YYYY বা DD-MM-YYYY (তোমার Sheet-এর মতো)
+  m = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (m) return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+
+  // ৩) YYYY-MM-DD (ISO ফরম্যাট)
+  const d = new Date(raw);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+// ── "কতদিন আগে আপলোড হয়েছে" — Sheet-এর কলাম E (date)-এ তারিখ থাকলে
+// সেটা থেকে "৩ দিন আগে" ইত্যাদি হিসাব করে ──
+function timeAgo(dateStr) {
+  const then = parseSheetDate(dateStr);
+  if (!then) return '';
+  const diffMs  = Date.now() - then.getTime();
+  if (diffMs < 0) return '';
+  const diffMin = Math.floor(diffMs / 60000);
+  const diffHr  = Math.floor(diffMin / 60);
+  const diffDay = Math.floor(diffHr / 24);
+  const diffMon = Math.floor(diffDay / 30);
+  const diffYr  = Math.floor(diffDay / 365);
+  if (diffMin < 60) return diffMin <= 1 ? 'কিছুক্ষণ আগে' : `${diffMin} মিনিট আগে`;
+  if (diffHr < 24)  return `${diffHr} ঘণ্টা আগে`;
+  if (diffDay < 30) return `${diffDay} দিন আগে`;
+  if (diffMon < 12) return `${diffMon} মাস আগে`;
+  return `${diffYr} বছর আগে`;
+}
+
 // ── থাম্বনেইল ফিক্স (আপডেট): wsrv.nl প্রক্সি একসাথে অনেক (৩০টা) রিকোয়েস্ট
 // পেলে rate-limit/timeout করে ফেলছিল — এই কারণেই প্রথমবার পেজ লোডে থাম্বনেইল
 // কালো দেখাচ্ছিল, আর রিলোড দিলে ঠিক হয়ে যাচ্ছিল (ততক্ষণে wsrv নিজে ক্যাশ
@@ -111,30 +152,24 @@ export default function Home({ initialVideos }) {
   const [views, setViews]           = useState({});
 
   useEffect(() => {
-    // ── ভিউ কাউন্ট ডিসপ্লে সাময়িকভাবে বন্ধ করা হলো (২০২৬-০৭-২৩)। কোড ডিলিট করা
-    // হয়নি, নিচের ব্লকটা comment করে রাখা হলো। আবার চালু করতে চাইলে শুধু
-    // /* এবং */ এই দুইটা মার্কার সরিয়ে দিলেই আগের মতো কাজ করবে। ──
-    /*
-    // ── ভিউ কাউন্ট: [slug].js পেজের মতোই একই Response Sheet থেকে
-    // সব ভিডিওর ভিউ (slug অনুযায়ী গোনা) নিয়ে আসা হচ্ছে, যাতে হোমপেজের
-    // কার্ডেও ভিডিও পেজের সাথে মিলিয়ে সঠিক, common ভিউ সংখ্যা দেখায় ──
-    fetch(`https://docs.google.com/spreadsheets/d/${VIEW_RESPONSES_SHEET_ID}/gviz/tq?tqx=out:json`)
+    // ── ভিউ কাউন্ট: [slug].js পেজের মতোই Apps Script-এর "Summary" শিট থেকে
+    // slug-অনুযায়ী আগে থেকে গোনা সংখ্যা পড়া হচ্ছে (fast, পুরো Response
+    // Sheet পড়তে হয় না) ──
+    fetch(`https://docs.google.com/spreadsheets/d/${VIEW_RESPONSES_SHEET_ID}/gviz/tq?tqx=out:json&sheet=Summary`)
       .then(res => res.text())
       .then(text => {
         const json = JSON.parse(text.substring(47, text.length - 2));
         const counts = {};
         json.table.rows.forEach(row => {
-          const s = row.c[1]?.v; // কলাম B = slug (prefix সহ, যেমন v2-xxxx)
-          // শুধু virallink2.site-এর নিজের এন্ট্রি গোনা হচ্ছে, prefix বাদ দিয়ে
+          const s = row.c[0]?.v; // কলাম A = slug (prefix সহ, যেমন v2-xxxx)
+          const c = row.c[1]?.v; // কলাম B = views
           if (s && s.startsWith('v2-')) {
-            const key = s.slice(3);
-            counts[key] = (counts[key] || 0) + 1;
+            counts[s.slice(3)] = Number(c) || 0;
           }
         });
         setViews(counts);
       })
       .catch(() => {});
-    */
   }, []);
 
   // ── পপআন্ডার এড ইনজেক্ট (আগে এখানে স্মার্টলিংক ছিল, সরিয়ে এইটা বসানো হলো) ──
@@ -147,39 +182,41 @@ export default function Home({ initialVideos }) {
     document.body.appendChild(script);
   }, []);
 
-  // ── TwinRed Interstitial: হোমপেজে ঢোকার ২০ সেকেন্ড পর প্রথমবার, তারপর
-  // প্রতি ২ মিনিট পর পর আবার দেখাবে (Zone: BDViralHub-Interstitial-Timed) ──
+  // ── JuicyAds Native Interstitial (Zone ID: 1123228): হোমপেজে ঢোকার
+  // ১৫ সেকেন্ড পর প্রথমবার স্ক্রিপ্ট অ্যাক্টিভ হবে, তারপর প্রতি ২ মিনিট পর পর
+  // আবার রিলোড হবে। মনে রাখবে: এই ফরম্যাটটা `data-targets="a"` অনুযায়ী
+  // লিংকে ক্লিক করলে ট্রিগার হওয়ার জন্য বানানো, তাই স্ক্রিপ্ট "লোড" হওয়া
+  // মানেই popup দেখা যাবে তা নাও হতে পারে — ইউজার এর ভিতরে কোনো লিংকে
+  // ক্লিক করলেই এটা কার্যকর হবে। ──
   useEffect(() => {
-    function loadInterstitialAd() {
-      const oldIns = document.getElementById('tr-interstitial-ins');
-      if (oldIns) oldIns.remove();
-
-      const ins = document.createElement('ins');
-      ins.id = 'tr-interstitial-ins';
-      ins.setAttribute('data-tr-zone', '01KYKDMTWP2FJJEYV7CWHREEG6');
-
+    function loadJuicyNativeInterstitial() {
+      const old = document.getElementById('juicyads-native-ads-script');
+      if (old) old.remove();
       const script = document.createElement('script');
+      script.id = 'juicyads-native-ads-script';
       script.type = 'text/javascript';
-      script.async = true;
-      script.src = 'https://s.ad.twinrdengine.com/adlib.js';
-
-      ins.appendChild(script);
-      document.body.appendChild(ins);
+      script.setAttribute('data-id', 'juicyads-native-ads');
+      script.setAttribute('data-ad-zone', '1123228');
+      script.setAttribute('data-targets', 'a');
+      script.src = 'https://js.juicyads.com/juicyads-native-ads.min.js';
+      document.body.appendChild(script);
     }
 
     const firstTimer = setTimeout(() => {
-      loadInterstitialAd();
-    }, 20000);
+      loadJuicyNativeInterstitial();
+    }, 15000); // ১৫ সেকেন্ড পর প্রথমবার
 
     let repeatInterval;
     const startRepeat = setTimeout(() => {
-      repeatInterval = setInterval(loadInterstitialAd, 120000);
-    }, 20000);
+      repeatInterval = setInterval(loadJuicyNativeInterstitial, 120000); // এরপর প্রতি ২ মিনিটে
+    }, 15000);
 
     return () => {
       clearTimeout(firstTimer);
       clearTimeout(startRepeat);
       if (repeatInterval) clearInterval(repeatInterval);
+      const s = document.getElementById('juicyads-native-ads-script');
+      if (s) s.remove();
     };
   }, []);
 
@@ -276,12 +313,11 @@ atOptions = {'key':'${key}','format':'iframe','height':${height},'width':${width
   return (
     <>
       <Head>
-        <meta name="juicyads-site-verification" content="6c7e2eeb94e355ac0b4b104e07d42fbb" />
         <title>ViralLink BD | আজকের ভাইরাল ভিডিও বাংলাদেশ ২০২৬</title>
-        <meta name="description" content="ViralLink BD - বাংলাদেশের ভাইরাল ভিডিও নেটওয়ার্ক। বাংলাদেশী সব হট ভাইরাল ভিডিও কালেকশন। প্রতিদিনের ট্রেন্ডিং বাংলাদেশী টিকটকারদের ভাইরাল ভিডিও আপলোড করা হয়।" />
+        <meta name="description" content="ViralLink BD - বাংলাদেশের ভাইরাল ভিডিও নেটওয়ার্ক। প্রতিদিনের ট্রেন্ডিং TikTok ক্লিপ, Facebook Reels, ফানি ভিডিও এক জায়গায় দেখুন।" />
         <meta name="keywords" content="tiktoker viral video, Bangladesh tiktoker viral video, tiktok viral video bangladesh, বাংলাদেশি ভাইরাল ভিডিও, facebook reels viral bd, funny video bangladesh" />
         <meta property="og:title" content="ViralLink BD | আজকের ভাইরাল ভিডিও বাংলাদেশ ২০২৬" />
-        <meta property="og:description" content="ViralLink BD - বাংলাদেশের ভাইরাল ভিডিও নেটওয়ার্ক। বাংলাদেশী সব হট ভাইরাল ভিডিও কালেকশন। প্রতিদিনের ট্রেন্ডিং বাংলাদেশী টিকটকারদের ভাইরাল ভিডিও আপলোড করা হয়।" />
+        <meta property="og:description" content="বাংলাদেশের ভাইরাল ভিডিও নেটওয়ার্ক। ট্রেন্ডিং TikTok ক্লিপ, Facebook Reels, ফানি ভিডিও ফ্রিতে দেখুন।" />
         <meta property="og:site_name" content="ViralLink BD" />
         <meta property="og:url" content="https://virallink2.site/" />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
@@ -348,8 +384,8 @@ atOptions = {'key':'${key}','format':'iframe','height':${height},'width':${width
                     <div className="card-title">{v.title}</div>
                     <div className="card-meta">
                       <span className="cat-badge">{v.categories.join(', ')}</span>
-                      {/* ভিউ কাউন্ট অপশন বন্ধ (২০২৬-০৭-২৩) — জায়গা বাঁচাতে হাইড করা হলো, কোড রাখা হলো কমেন্টে
-                      <span>👁 {formatNum(views[v.slug] || 0)}</span> */}
+                      <span>👁 {formatNum(views[v.slug] || 0)}</span>
+                      {v.date && <span> · {timeAgo(v.date) || v.date}</span>}
                     </div>
                   </div>
                 </a>
@@ -438,4 +474,4 @@ atOptions = {'key':'${key}','format':'iframe','height':${height},'width':${width
       </footer>
     </>
   );
-    }
+                                               }
