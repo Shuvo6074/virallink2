@@ -276,11 +276,12 @@ atOptions = {'key':'${key}','format':'iframe','height':${height},'width':${width
   return (
     <>
       <Head>
+        <meta name="juicyads-site-verification" content="6c7e2eeb94e355ac0b4b104e07d42fbb" />
         <title>ViralLink BD | আজকের ভাইরাল ভিডিও বাংলাদেশ ২০২৬</title>
-        <meta name="description" content="ViralLink BD - বাংলাদেশের ভাইরাল ভিডিও নেটওয়ার্ক। প্রতিদিনের ট্রেন্ডিং TikTok ক্লিপ, Facebook Reels, ফানি ভিডিও এক জায়গায় দেখুন।" />
+        <meta name="description" content="ViralLink BD - বাংলাদেশের ভাইরাল ভিডিও নেটওয়ার্ক। বাংলাদেশী সব হট ভাইরাল ভিডিও কালেকশন। প্রতিদিনের ট্রেন্ডিং বাংলাদেশী টিকটকারদের ভাইরাল ভিডিও আপলোড করা হয়।" />
         <meta name="keywords" content="tiktoker viral video, Bangladesh tiktoker viral video, tiktok viral video bangladesh, বাংলাদেশি ভাইরাল ভিডিও, facebook reels viral bd, funny video bangladesh" />
         <meta property="og:title" content="ViralLink BD | আজকের ভাইরাল ভিডিও বাংলাদেশ ২০২৬" />
-        <meta property="og:description" content="বাংলাদেশের ভাইরাল ভিডিও নেটওয়ার্ক। ট্রেন্ডিং TikTok ক্লিপ, Facebook Reels, ফানি ভিডিও ফ্রিতে দেখুন।" />
+        <meta property="og:description" content="ViralLink BD - বাংলাদেশের ভাইরাল ভিডিও নেটওয়ার্ক। বাংলাদেশী সব হট ভাইরাল ভিডিও কালেকশন। প্রতিদিনের ট্রেন্ডিং বাংলাদেশী টিকটকারদের ভাইরাল ভিডিও আপলোড করা হয়।" />
         <meta property="og:site_name" content="ViralLink BD" />
         <meta property="og:url" content="https://virallink2.site/" />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
