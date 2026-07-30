@@ -54,11 +54,11 @@ function timeAgo(dateStr) {
   const diffDay = Math.floor(diffHr / 24);
   const diffMon = Math.floor(diffDay / 30);
   const diffYr  = Math.floor(diffDay / 365);
-  if (diffMin < 60) return diffMin <= 1 ? 'কিছুক্ষণ আগে' : `${diffMin} মিনিট আগে`;
-  if (diffHr < 24)  return `${diffHr} ঘণ্টা আগে`;
-  if (diffDay < 30) return `${diffDay} দিন আগে`;
-  if (diffMon < 12) return `${diffMon} মাস আগে`;
-  return `${diffYr} বছর আগে`;
+  if (diffMin < 60) return diffMin <= 1 ? 'just now' : `${diffMin} minute${diffMin === 1 ? '' : 's'} ago`;
+  if (diffHr < 24)  return `${diffHr} hour${diffHr === 1 ? '' : 's'} ago`;
+  if (diffDay < 30) return `${diffDay} day${diffDay === 1 ? '' : 's'} ago`;
+  if (diffMon < 12) return `${diffMon} month${diffMon === 1 ? '' : 's'} ago`;
+  return `${diffYr} year${diffYr === 1 ? '' : 's'} ago`;
 }
 
 // ── থাম্বনেইল ফিক্স (আপডেট): index.js-এর মতোই — postimg.cc লিংকের জন্য
@@ -429,7 +429,11 @@ atOptions = {
           .video-container{position:relative;padding-top:56.25%;background:#000;border-radius:var(--radius);overflow:hidden;margin-bottom:1rem;}
           .video-container video,.video-container iframe{position:absolute;inset:0;width:100%;height:100%;border:none;}
           .video-title-big{font-family:'Bebas Neue',sans-serif;font-size:1.5rem;letter-spacing:0.5px;margin-bottom:0.75rem;line-height:1.2;}
-          .video-stats-row{display:flex;gap:1.5rem;color:var(--muted);font-size:0.82rem;margin-bottom:1rem;flex-wrap:wrap;}
+          .video-stats-row{display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:0.82rem;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem;}
+          .stats-left{display:flex;align-items:center;gap:0.35rem;color:var(--muted);}
+          .stats-category{color:var(--muted);}
+          .stats-date{color:var(--muted);}
+          .stats-views{color:var(--muted);white-space:nowrap;}
           .video-actions{display:flex;gap:0.6rem;flex-wrap:nowrap;margin-bottom:1rem;padding-bottom:1rem;border-bottom:1px solid var(--border);overflow-x:auto;}
           .action-btn{display:flex;align-items:center;gap:0.35rem;padding:0.45rem 0.9rem;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface2);color:var(--text);cursor:pointer;font-family:inherit;font-size:0.82rem;font-weight:600;transition:all 0.2s;text-decoration:none;white-space:nowrap;}
           .action-btn:hover{border-color:var(--accent);color:var(--accent);}
@@ -511,10 +515,11 @@ atOptions = {
             <h1 className="video-title-big">{video.title}</h1>
 
             <div className="video-stats-row">
-              <span>👁 {formatNum(views[video.slug] || 0)} views</span>
-              <span>❤️ {formatNum(likes[video.id] || 0)} likes</span>
-              <span>📁 {video.categories.join(', ')}</span>
-              {video.date && <span>📅 {timeAgo(video.date) || video.date}</span>}
+              <div className="stats-left">
+                <span className="stats-category">{video.categories.join(', ')}</span>
+                {video.date && <span className="stats-date">· {timeAgo(video.date) || video.date}</span>}
+              </div>
+              <span className="stats-views">👁 {formatNum(views[video.slug] || 0)} views</span>
             </div>
 
             {video.description && (
@@ -559,7 +564,11 @@ atOptions = {
                     </div>
                     <div className="related-info">
                       <div className="related-title-text">{v.title}</div>
-                      <div className="related-meta">{v.categories.join(', ')}</div>
+                      <div className="related-meta">
+                      <span>{v.categories.join(', ')}</span>
+                      <span> · 👁 {formatNum(views[v.slug] || 0)}</span>
+                      {v.date && <span> · {timeAgo(v.date) || v.date}</span>}
+                    </div>
                     </div>
                   </a>
                 ))}
@@ -592,7 +601,11 @@ atOptions = {
                   </div>
                   <div className="related-info">
                     <div className="related-title-text">{v.title}</div>
-                    <div className="related-meta">{v.categories.join(', ')}</div>
+                    <div className="related-meta">
+                      <span>{v.categories.join(', ')}</span>
+                      <span> · 👁 {formatNum(views[v.slug] || 0)}</span>
+                      {v.date && <span> · {timeAgo(v.date) || v.date}</span>}
+                    </div>
                   </div>
                 </a>
               ))}
@@ -606,4 +619,4 @@ atOptions = {
       </div>
     </>
   );
-      }
+            }
