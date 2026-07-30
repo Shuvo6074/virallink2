@@ -53,11 +53,11 @@ function timeAgo(dateStr) {
   const diffDay = Math.floor(diffHr / 24);
   const diffMon = Math.floor(diffDay / 30);
   const diffYr  = Math.floor(diffDay / 365);
-  if (diffMin < 60) return diffMin <= 1 ? 'কিছুক্ষণ আগে' : `${diffMin} মিনিট আগে`;
-  if (diffHr < 24)  return `${diffHr} ঘণ্টা আগে`;
-  if (diffDay < 30) return `${diffDay} দিন আগে`;
-  if (diffMon < 12) return `${diffMon} মাস আগে`;
-  return `${diffYr} বছর আগে`;
+  if (diffMin < 60) return diffMin <= 1 ? 'just now' : `${diffMin} minute${diffMin === 1 ? '' : 's'} ago`;
+  if (diffHr < 24)  return `${diffHr} hour${diffHr === 1 ? '' : 's'} ago`;
+  if (diffDay < 30) return `${diffDay} day${diffDay === 1 ? '' : 's'} ago`;
+  if (diffMon < 12) return `${diffMon} month${diffMon === 1 ? '' : 's'} ago`;
+  return `${diffYr} year${diffYr === 1 ? '' : 's'} ago`;
 }
 
 // ── থাম্বনেইল ফিক্স (আপডেট): wsrv.nl প্রক্সি একসাথে অনেক (৩০টা) রিকোয়েস্ট
@@ -474,4 +474,4 @@ atOptions = {'key':'${key}','format':'iframe','height':${height},'width':${width
       </footer>
     </>
   );
-                                               }
+    }
