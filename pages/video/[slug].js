@@ -33,9 +33,19 @@ function parseSheetDate(raw) {
   let m = raw.match(/^Date\((\d+),(\d+),(\d+)/);
   if (m) return new Date(Number(m[1]), Number(m[2]), Number(m[3]));
 
-  // ২) হাতে লেখা DD/MM/YYYY বা DD-MM-YYYY (তোমার Sheet-এর মতো)
+  // ২) স্ল্যাশ/হাইফেন দিয়ে লেখা তারিখ — DD/MM/YYYY অথবা MM/DD/YYYY দুটোই হতে পারে।
+  // যেই সংখ্যাটা ১২-এর বেশি সেটাই আসলে "দিন" (day), কারণ মাস কখনো ১২-এর বেশি হয় না।
+  // এই ফিক্সের আগে কোড সবসময় DD/MM ধরে নিত, তাই "07/31/2026"-এর মতো
+  // MM/DD/YYYY এন্ট্রি ভুলভাবে পার্স হচ্ছিল (মাস ৩১ ধরে নিত) — এখন সেটা ঠিক হলো।
   m = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-  if (m) return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+  if (m) {
+    const a = Number(m[1]), b = Number(m[2]), y = Number(m[3]);
+    let day, month;
+    if (a > 12) { day = a; month = b; }         // DD/MM/YYYY (প্রথম সংখ্যা ১২-এর বেশি)
+    else if (b > 12) { day = b; month = a; }    // MM/DD/YYYY (দ্বিতীয় সংখ্যা ১২-এর বেশি)
+    else { day = b; month = a; }                 // দুটোই ≤12 হলে MM/DD/YYYY ধরে নেওয়া হলো (Sheet-এর বর্তমান ফরম্যাট)
+    return new Date(y, month - 1, day);
+  }
 
   // ৩) YYYY-MM-DD (ISO ফরম্যাট)
   const d = new Date(raw);
@@ -375,7 +385,11 @@ atOptions = {
     "name": video.title,
     "description": video.description || video.title,
     "thumbnailUrl": video.thumbnail,
-    "uploadDate": video.date || new Date().toISOString().split('T')[0],
+    // ⚠️ ফিক্স: আগে video.date-এর raw স্ট্রিং (যেমন "07/31/2026") সরাসরি বসে যেত,
+    // যেটা ISO 8601 ফরম্যাট না হওয়ায় Google Search Console "Date/time not in
+    // ISO 8601 format" এরর দিচ্ছিল। এখন parseSheetDate() দিয়ে প্রথমে সঠিকভাবে
+    // পার্স করে, তারপর .toISOString() দিয়ে সবসময় "YYYY-MM-DD" ফরম্যাটে বসানো হচ্ছে।
+    "uploadDate": (parseSheetDate(video.date) || new Date()).toISOString().split('T')[0],
     "contentUrl": video.videoUrl,
     "embedUrl": pageUrl,
     "publisher": { "@type": "Organization", "name": "ViralLink BD", "url": SITE_URL }
