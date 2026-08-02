@@ -104,11 +104,6 @@ function getUniqueSlugs(rows, slugifyFn) {
   });
 }
 
-// ⚠️ ভিউ কাউন্ট এখন Google Form-এর মাধ্যমে জমা হয় (Apps Script লাগে না)
-const VIEW_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLScWpnit1sXMbza8XgWmdVV065Y6oYFC9zWEu7i0tGBoQW0S8w/formResponse';
-const VIEW_FORM_ENTRY = 'entry.1785504240';
-const VIEW_RESPONSES_SHEET_ID = '1-y075MwICFApp4D6Ie-7FxDNVl-pkJHpQSiu396nQoI';
-
 function getEmbedUrl(url) {
   if (!url) return '';
   if (url.includes('archive.org/embed/')) return url;
@@ -223,42 +218,22 @@ export default function VideoPage({ video, related }) {
       setLiked(!!l[video.id]);
     } catch(e) {}
 
-    // ── ভিউ কাউন্ট: প্রতিবার পেজ খুললে এই ভিডিওর slug একটা Google Form-এ
-    // জমা (submit) হয়। এটাই একটা "ভিউ" হিসেবে গণনা হয়। সব ভিজিটরের
-    // জমা একই Response Sheet-এ গিয়ে জমা হয়, তাই এটা সবার জন্য COMMON,
-    // real সংখ্যা — localStorage-এর মতো নিজের ব্রাউজারে সীমাবদ্ধ না। ──
+    // ── ভিউ কাউন্ট (নতুন সিস্টেম): এখন Google Form/Sheets-এর বদলে
+    // Cloudflare D1 database ব্যবহার হচ্ছে। প্রতিবার পেজ খুললে এই ভিডিওর
+    // slug আমাদের নিজস্ব API route (/api/track-view)-এ পাঠানো হয়, যেটা
+    // সরাসরি D1-এ count +1 করে দেয়। এটা সবার জন্য COMMON, real সংখ্যা। ──
     try {
-      const formData = new URLSearchParams();
-      // ── সাইট আইডেন্টিফায়ার প্রিফিক্স 'v2-' যোগ করা হলো, যাতে
-      // virallink2.site আর bd-viral-hub-এর ভিউ একই sheet-এ গিয়েও
-      // একে অপরের সাথে মিশে না যায় ──
-      formData.append(VIEW_FORM_ENTRY, `v2-${video.slug}`);
-      fetch(VIEW_FORM_URL, {
+      fetch('/api/track-view', {
         method: 'POST',
-        mode: 'no-cors', // Google Form নিজে থেকেই এটা require করে, রেসপন্স পড়া যায় না কিন্তু submit ঠিকই হয়
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: formData.toString()
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug: video.slug })
       }).catch(() => {});
     } catch(e) {}
 
-    // ── Apps Script-এর তৈরি "Summary" শিট থেকে ভিউ কাউন্ট পড়া হচ্ছে (fast) —
-    // পুরো Response Sheet না পড়ে শুধু slug-অনুযায়ী আগে থেকেই গোনা সংখ্যাগুলো
-    // পড়া হচ্ছে, তাই ভিউ যতই বাড়ুক পেজ লোড ধীর হবে না ──
-    fetch(`https://docs.google.com/spreadsheets/d/${VIEW_RESPONSES_SHEET_ID}/gviz/tq?tqx=out:json&sheet=Summary`)
-      .then(res => res.text())
-      .then(text => {
-        const json = JSON.parse(text.substring(47, text.length - 2));
-        const counts = {};
-        json.table.rows.forEach(row => {
-          const s = row.c[0]?.v; // কলাম A = slug (prefix সহ, যেমন v2-xxxx)
-          const c = row.c[1]?.v; // কলাম B = views
-          // শুধু virallink2.site-এর নিজের এন্ট্রি গোনা হচ্ছে, prefix বাদ দিয়ে
-          if (s && s.startsWith('v2-')) {
-            counts[s.slice(3)] = Number(c) || 0;
-          }
-        });
-        setViews(counts);
-      })
+    // ── D1 থেকে সব ভিডিওর ভিউ কাউন্ট একসাথে fetch করা হচ্ছে (fast) ──
+    fetch('/api/get-views')
+      .then(res => res.json())
+      .then(counts => setViews(counts))
       .catch(() => {});
   }, [video.id]);
 
@@ -633,4 +608,4 @@ atOptions = {
       </div>
     </>
   );
-            }
+}
