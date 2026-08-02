@@ -93,10 +93,6 @@ function parseCategories(str) {
 
 const SHEET_ID_SSR = '1CJU7TtQAvLGwVIrFB4G6uIyDy0m0Uz54kB6ZBpar4zE';
 
-// ⚠️ [slug].js পেজে ব্যবহৃত একই Google Form Response Sheet, ভিউ কাউন্ট
-// একই জায়গা থেকে পড়ার জন্য (যাতে হোমপেজ ও ভিডিও পেজে সংখ্যা মেলে)
-const VIEW_RESPONSES_SHEET_ID = '1-y075MwICFApp4D6Ie-7FxDNVl-pkJHpQSiu396nQoI';
-
 function slugifySSR(text) {
   return text.toString().toLowerCase()
     .replace(/\s+/g, '-')
@@ -162,23 +158,11 @@ export default function Home({ initialVideos }) {
   const [views, setViews]           = useState({});
 
   useEffect(() => {
-    // ── ভিউ কাউন্ট: [slug].js পেজের মতোই Apps Script-এর "Summary" শিট থেকে
-    // slug-অনুযায়ী আগে থেকে গোনা সংখ্যা পড়া হচ্ছে (fast, পুরো Response
-    // Sheet পড়তে হয় না) ──
-    fetch(`https://docs.google.com/spreadsheets/d/${VIEW_RESPONSES_SHEET_ID}/gviz/tq?tqx=out:json&sheet=Summary`)
-      .then(res => res.text())
-      .then(text => {
-        const json = JSON.parse(text.substring(47, text.length - 2));
-        const counts = {};
-        json.table.rows.forEach(row => {
-          const s = row.c[0]?.v; // কলাম A = slug (prefix সহ, যেমন v2-xxxx)
-          const c = row.c[1]?.v; // কলাম B = views
-          if (s && s.startsWith('v2-')) {
-            counts[s.slice(3)] = Number(c) || 0;
-          }
-        });
-        setViews(counts);
-      })
+    // ── ভিউ কাউন্ট (নতুন সিস্টেম): এখন Google Sheets-এর বদলে Cloudflare D1
+    // database থেকে সব ভিডিওর ভিউ কাউন্ট একসাথে fetch করা হচ্ছে ──
+    fetch('/api/get-views')
+      .then(res => res.json())
+      .then(counts => setViews(counts))
       .catch(() => {});
   }, []);
 
