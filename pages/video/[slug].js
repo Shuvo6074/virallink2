@@ -460,11 +460,15 @@ atOptions = {
   }, [video.id]);
 
   // ── In-Page Push Ad (deductgreedyheadroom.com) — এটা মোবাইলে স্ক্রিনের
-  // নিচের দিকে notification-স্টাইলে ভেসে ওঠে। ভিডিও পাল্টালে পুরনো স্ক্রিপ্ট
-  // রিমুভ করে নতুন করে লোড করা হচ্ছে, যাতে ডুপ্লিকেট না হয়। ──
+  // নিচের দিকে notification-স্টাইলে ভেসে ওঠে।
+  // NOTE: video.id পাল্টালেও এই effect বারবার রান করা যাবে না — কারণ
+  // স্ক্রিপ্টটা রান হয়ে নিজেই একটা নোটিফিকেশন এলিমেন্ট বানিয়ে ফেলে,
+  // যেটা <script> ট্যাগ রিমুভ করলেও DOM থেকে সরে না। বারবার লোড করলে
+  // পুরনো নোটিফিকেশনের উপর নতুন আরেকটা জমা হয়ে ডুপ্লিকেট দেখায়।
+  // তাই window-level flag দিয়ে গার্ড করে পুরো পেজ লোডে একবারই চালানো হচ্ছে।
   useEffect(() => {
-    const old = document.getElementById('inpage-push-ad-script');
-    if (old) old.remove();
+    if (window.__inPagePushLoaded) return;
+    window.__inPagePushLoaded = true;
 
     const script = document.createElement('script');
     script.id = 'inpage-push-ad-script';
@@ -473,12 +477,7 @@ atOptions = {
     script.setAttribute('data-clipid', '2134889');
     script.src = '//deductgreedyheadroom.com/in.js';
     document.body.appendChild(script);
-
-    return () => {
-      const s = document.getElementById('inpage-push-ad-script');
-      if (s) s.remove();
-    };
-  }, [video.id]);
+  }, []);
 
   function toggleLike() {
     const newLikes = { ...likes };
@@ -814,4 +813,4 @@ atOptions = {
       </div>
     </>
   );
-      }
+}
