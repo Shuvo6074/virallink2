@@ -422,62 +422,7 @@ atOptions = {
   }, [video.id]);
 
 
-  // ১ মিনিট পর প্রথমবার স্ক্রিপ্ট অ্যাক্টিভ হবে, তারপর প্রতি ২ মিনিট পর পর
-  // আবার রিলোড হবে। মনে রাখবে: এই ফরম্যাটটা `data-targets="a"` অনুযায়ী
-  // লিংকে ক্লিক করলে ট্রিগার হওয়ার জন্য বানানো, তাই স্ক্রিপ্ট "লোড" হওয়া
-  // মানেই popup দেখা যাবে তা নাও হতে পারে — ইউজার এর ভিতরে কোনো লিংকে
-  // ক্লিক করলেই এটা কার্যকর হবে। ──
-  useEffect(() => {
-    function loadJuicyNativeInterstitial() {
-      const old = document.getElementById('juicyads-native-ads-script');
-      if (old) old.remove();
-      const script = document.createElement('script');
-      script.id = 'juicyads-native-ads-script';
-      script.type = 'text/javascript';
-      script.setAttribute('data-id', 'juicyads-native-ads');
-      script.setAttribute('data-ad-zone', '1123228');
-      script.setAttribute('data-targets', 'a');
-      script.src = 'https://js.juicyads.com/juicyads-native-ads.min.js';
-      document.body.appendChild(script);
-    }
 
-    const firstTimer = setTimeout(() => {
-      loadJuicyNativeInterstitial();
-    }, 60000); // ১ মিনিট পর প্রথমবার
-
-    let repeatInterval;
-    const startRepeat = setTimeout(() => {
-      repeatInterval = setInterval(loadJuicyNativeInterstitial, 120000); // এরপর প্রতি ২ মিনিটে
-    }, 60000);
-
-    return () => {
-      clearTimeout(firstTimer);
-      clearTimeout(startRepeat);
-      if (repeatInterval) clearInterval(repeatInterval);
-      const s = document.getElementById('juicyads-native-ads-script');
-      if (s) s.remove();
-    };
-  }, [video.id]);
-
-  // ── In-Page Push Ad (deductgreedyheadroom.com) — এটা মোবাইলে স্ক্রিনের
-  // নিচের দিকে notification-স্টাইলে ভেসে ওঠে।
-  // NOTE: video.id পাল্টালেও এই effect বারবার রান করা যাবে না — কারণ
-  // স্ক্রিপ্টটা রান হয়ে নিজেই একটা নোটিফিকেশন এলিমেন্ট বানিয়ে ফেলে,
-  // যেটা <script> ট্যাগ রিমুভ করলেও DOM থেকে সরে না। বারবার লোড করলে
-  // পুরনো নোটিফিকেশনের উপর নতুন আরেকটা জমা হয়ে ডুপ্লিকেট দেখায়।
-  // তাই window-level flag দিয়ে গার্ড করে পুরো পেজ লোডে একবারই চালানো হচ্ছে।
-  useEffect(() => {
-    if (window.__inPagePushLoaded) return;
-    window.__inPagePushLoaded = true;
-
-    const script = document.createElement('script');
-    script.id = 'inpage-push-ad-script';
-    script.async = true;
-    script.setAttribute('data-cfasync', 'false');
-    script.setAttribute('data-clipid', '2134889');
-    script.src = '//deductgreedyheadroom.com/in.js';
-    document.body.appendChild(script);
-  }, []);
 
   function toggleLike() {
     const newLikes = { ...likes };
