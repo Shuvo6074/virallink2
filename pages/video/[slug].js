@@ -459,6 +459,27 @@ atOptions = {
     };
   }, [video.id]);
 
+  // ── In-Page Push Ad (deductgreedyheadroom.com) — এটা মোবাইলে স্ক্রিনের
+  // নিচের দিকে notification-স্টাইলে ভেসে ওঠে। ভিডিও পাল্টালে পুরনো স্ক্রিপ্ট
+  // রিমুভ করে নতুন করে লোড করা হচ্ছে, যাতে ডুপ্লিকেট না হয়। ──
+  useEffect(() => {
+    const old = document.getElementById('inpage-push-ad-script');
+    if (old) old.remove();
+
+    const script = document.createElement('script');
+    script.id = 'inpage-push-ad-script';
+    script.async = true;
+    script.setAttribute('data-cfasync', 'false');
+    script.setAttribute('data-clipid', '2134889');
+    script.src = '//deductgreedyheadroom.com/in.js';
+    document.body.appendChild(script);
+
+    return () => {
+      const s = document.getElementById('inpage-push-ad-script');
+      if (s) s.remove();
+    };
+  }, [video.id]);
+
   function toggleLike() {
     const newLikes = { ...likes };
     if (newLikes[video.id]) { delete newLikes[video.id]; setLiked(false); }
@@ -793,4 +814,4 @@ atOptions = {
       </div>
     </>
   );
-}
+      }
