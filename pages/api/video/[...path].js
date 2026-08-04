@@ -1,49 +1,38 @@
 // ফাইলের পাথ: pages/api/video/[...path].js
 //
-// আপনার রিপোতে ইতিমধ্যে "pages/api" ফোল্ডার আছে —
-// তার ভেতরে "video" নামে নতুন ফোল্ডার বানিয়ে, তার ভেতরে
-// "[...path].js" নামে এই ফাইলটা বসান।
-//
-// ফলাফল: https://virallink2.site/api/video/videos/<slug>/master.m3u8
-// এই URL হিট করলে এই কোড চলবে এবং R2 থেকে ভিডিও এনে দেবে —
-// ব্রাউজারে আসল R2 লিংক কখনো দেখাবে না।
+// ব্যবহার: https://virallink2.site/api/video/videos/<slug>/master.m3u8
+// এই URL হিট করলে এই কোড রিফারার চেক করে এবং R2 থেকে ভিডিও এনে দেবে —
+// ব্রাউজারে আসল R2 লিংক প্রকাশ হবে না।
 
-export const config = {
-  runtime: "edge",
-};
-
-export default async function handler(request) {
-  const url = new URL(request.url);
-
-  // /api/video/ এর পরের অংশটা বের করা, যেমন: videos/my-slug/master.m3u8
-  const path = url.pathname.replace(/^\/api\/video\//, "");
+export default async function handler(req, res) {
+  const pathSegments = req.query.path || [];
+  const path = Array.isArray(pathSegments) ? pathSegments.join("/") : pathSegments;
 
   const R2_BASE = process.env.R2_PUBLIC_BASE_URL;
 
   if (!R2_BASE) {
-    return new Response("Server misconfigured", { status: 500 });
+    res.status(500).send("Server misconfigured");
+    return;
   }
 
   // ---- Referer চেক (হটলিংক প্রোটেকশন) ----
-  const referer = request.headers.get("referer") || "";
-  const allowedHosts = ["virallink2.site"]; // bd-viral-hub এর ডোমেইন পরে এখানে যোগ করবেন
+  const referer = req.headers.referer || "";
+  const allowedHosts = ["virallink2.site"]; // bd-viral-hub এর হোস্ট এখানে অ্যাড করতে পারেন
 
-  const refererHost = (() => {
-    try {
-      return new URL(referer).hostname;
-    } catch {
-      return null;
-    }
-  })();
+  let refererHost = null;
+  try {
+    refererHost = referer ? new URL(referer).hostname : null;
+  } catch {
+    refererHost = null;
+  }
 
   const isAllowed =
     refererHost &&
-    allowedHosts.some(
-      (h) => refererHost === h || refererHost.endsWith("." + h)
-    );
+    allowedHosts.some((h) => refererHost === h || refererHost.endsWith("." + h));
 
   if (!isAllowed) {
-    return new Response("Forbidden", { status: 403 });
+    res.status(403).send("Forbidden");
+    return;
   }
 
   // ---- আসল R2 URL থেকে ফাইল আনা (সার্ভার-সাইড) ----
@@ -51,22 +40,22 @@ export default async function handler(request) {
   const upstreamRes = await fetch(upstreamUrl);
 
   if (!upstreamRes.ok) {
-    return new Response("Not found", { status: 404 });
+    res.status(404).send("Not found");
+    return;
   }
 
-  const headers = new Headers();
-  headers.set("Cache-Control", "public, max-age=31536000, immutable");
-
   if (path.endsWith(".m3u8")) {
-    headers.set("Content-Type", "application/vnd.apple.mpegurl");
+    res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
   } else if (path.endsWith(".ts")) {
-    headers.set("Content-Type", "video/mp2t");
+    res.setHeader("Content-Type", "video/mp2t");
   } else {
-    headers.set(
+    res.setHeader(
       "Content-Type",
       upstreamRes.headers.get("content-type") || "application/octet-stream"
     );
   }
+  res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
 
-  return new Response(upstreamRes.body, { headers, status: 200 });
-      }
+  const buffer = Buffer.from(await upstreamRes.arrayBuffer());
+  res.status(200).send(buffer);
+}
