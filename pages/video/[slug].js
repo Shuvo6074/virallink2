@@ -212,6 +212,7 @@ export default function VideoPage({ video, related, moreVideos }) {
   const hasMoreToLoad = extraCount < infiniteScrollPool.length;
 
   const SMARTLINK_URL = 'https://www.effectivecpmnetwork.com/hzn588p39q?key=c22e2da4de74dbe9769bd7bcc477bb63';
+  const SMARTLINK_URL2 = 'https://omg10.com/4/10302499';
 
   // ── স্টিকি বটম ব্যানার অ্যাড (নতুন, 320x50): প্রতিটা ভিডিও প্লেয়ার পেজে
   // স্ক্রিনের নিচ থেকে সামান্য উপরে ভেসে থাকবে। ক্রস (✕) বাটনে প্রথমবার
@@ -224,7 +225,7 @@ export default function VideoPage({ video, related, moreVideos }) {
 
   function handleStickyAdClose() {
     if (stickyAdClickRef.current === 0) {
-      window.open(SMARTLINK_URL, '_blank');
+      window.open(SMARTLINK_URL2, '_blank');
       stickyAdClickRef.current = 1;
     } else {
       setStickyAdVisible(false);
@@ -253,12 +254,12 @@ export default function VideoPage({ video, related, moreVideos }) {
 
   function handleDownloadClick(e) {
     e.preventDefault();
-    window.open(SMARTLINK_URL, '_blank');
+    window.open(SMARTLINK_URL2, '_blank');
   }
 
   function handleBackClick(e) {
     e.preventDefault();
-    window.open(SMARTLINK_URL, '_blank');
+    window.open(SMARTLINK_URL2, '_blank');
     setTimeout(() => { window.location.href = '/'; }, 50);
   }
 
