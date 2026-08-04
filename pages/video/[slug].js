@@ -117,23 +117,6 @@ function getEmbedUrl(url) {
   return url;
 }
 
-// ── নতুন: Sheet-এর "hls_url" কলামে (column H, index 7) হয় পুরো R2 লিংক
-// (যেমন https://pub-xxxx.r2.dev/videos/slug/master.m3u8) অথবা শুধু
-// path অংশ (videos/slug/master.m3u8) বসানো যাবে — দুটোই কাজ করবে।
-// এই ফাংশন যেকোনো ফরম্যাট থেকে শুধু path অংশটুকু বের করে আনে, যাতে
-// সেটা /api/video/<path> প্রোটেক্টেড প্রক্সি রুটে পাঠানো যায় (আসল R2
-// লিংক ব্রাউজারে কখনো প্রকাশ হয় না)। ──
-function getHlsProxyPath(raw) {
-  if (!raw) return '';
-  const trimmed = raw.trim();
-  try {
-    const u = new URL(trimmed); // পুরো URL হলে শুধু pathname নেওয়া হচ্ছে
-    return u.pathname.replace(/^\/+/, '');
-  } catch {
-    return trimmed.replace(/^\/+/, ''); // ইতিমধ্যে relative path হলে সরাসরি ব্যবহার
-  }
-}
-
 export async function getServerSideProps({ params, res: httpRes }) {
   // ── পারফরম্যান্স ফিক্স: index.js-এর মতোই এই পেজও Edge-এ ৬০ সেকেন্ড
   // cache হবে, দ্বিতীয়বার একই ভিডিও পেজে কেউ গেলে সাথে সাথে লোড হবে। ──
@@ -155,7 +138,6 @@ export async function getServerSideProps({ params, res: httpRes }) {
       date:        row.c[4]?.v || '',
       duration:    row.c[5]?.v || '',
       description: row.c[6]?.v || '',
-      hlsPath:     getHlsProxyPath(row.c[7]?.v || ''), // ── নতুন কলাম H: hls_url ──
       slug:        uniqueSlugs[i]
     })).filter(v => v.title !== 'Title').reverse()
       .map((v, idx) => ({ ...v, pageBatch: Math.floor(idx / PER_PAGE) + 1 }));
@@ -203,63 +185,6 @@ export async function getServerSideProps({ params, res: httpRes }) {
   }
 }
 
-// ── নতুন: নিজস্ব R2 (Cloudflare) থেকে আসা ভিডিওর জন্য ইউনিভার্সাল কাস্টম
-// প্লেয়ার — এই একটা কম্পোনেন্টই .m3u8 (HLS) এবং .mp4/.webm/.mov দুই ধরনের
-// ফাইলই চেনে ও চালায়, তাই Sheet-এর hls_url কলামে যেকোনো একটা ফরম্যাট
-// বসালেই চলবে (আলাদা কনভার্সনের দরকার নেই, চাইলে HLS-ও করা যায়)।
-// - .m3u8 হলে: hls.js (CDN থেকে লোড, npm ইনস্টলের দরকার নেই) দিয়ে চলে;
-//   Safari-তে native HLS সাপোর্ট থাকায় সেখানে hls.js লাগে না।
-// - .mp4/.webm/.mov হলে: সাধারণ <video><source> দিয়ে সরাসরি চলে। ──
-function ProtectedPlayer({ src }) {
-  const videoRef = useRef(null);
-  const isHls = /\.m3u8(\?|$)/i.test(src);
-
-  useEffect(() => {
-    if (!isHls) return; // MP4/WebM-এর জন্য আলাদা JS সেটআপ লাগে না
-    const video = videoRef.current;
-    if (!video || !src) return;
-
-    let hls;
-
-    function setup() {
-      if (video.canPlayType('application/vnd.apple.mpegurl')) {
-        video.src = src; // Safari / iOS native HLS
-      } else if (window.Hls && window.Hls.isSupported()) {
-        hls = new window.Hls();
-        hls.loadSource(src);
-        hls.attachMedia(video);
-      }
-    }
-
-    if (window.Hls) {
-      setup();
-    } else {
-      const script = document.createElement('script');
-      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.15/hls.min.js';
-      script.onload = setup;
-      document.body.appendChild(script);
-    }
-
-    return () => {
-      if (hls) hls.destroy();
-    };
-  }, [src, isHls]);
-
-  return (
-    <video
-      ref={videoRef}
-      controls
-      autoPlay
-      playsInline
-      preload="metadata"
-      controlsList="nodownload"
-      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', background: '#000', objectFit: 'contain' }}
-    >
-      {!isHls && <source src={src} />}
-    </video>
-  );
-}
-
 export default function VideoPage({ video, related, moreVideos }) {
   const [likes, setLikes] = useState({});
   const [views, setViews] = useState({});
@@ -278,15 +203,15 @@ export default function VideoPage({ video, related, moreVideos }) {
   const loadMoreRef = useRef(null);
 
   const initialRelated = related.slice(0, INITIAL_RELATED_SHOW);
-  // ── আপডেট: infiniteScrollPool এখন শুধু related-এর বাকি অংশ (১২-৪০), মোট
-  // সর্বোচ্চ ৪০টা ভিডিও দেখাবে (moreVideos আর যোগ হচ্ছে না) — ৪০ শেষ হলে
-  // স্ক্রল থেমে যাবে এবং নিচে ব্যানার এড দেখাবে। ──
-  const infiniteScrollPool = related.slice(INITIAL_RELATED_SHOW);
+  // ── infiniteScrollPool = related-এর বাকি অংশ (১২-৪০) + সাইটের বাকি সব
+  // ভিডিও (moreVideos)। এই পুলটাই "আরও ভিডিও" সেকশনে ব্যবহার হয়, তাই
+  // ৪০টার পরেও স্ক্রল করলে ভিডিও আসতেই থাকবে, সাইটের সব ভিডিও শেষ না
+  // হওয়া পর্যন্ত। ──
+  const infiniteScrollPool = [...related.slice(INITIAL_RELATED_SHOW), ...moreVideos];
   const extraRelated = infiniteScrollPool.slice(0, extraCount);
   const hasMoreToLoad = extraCount < infiniteScrollPool.length;
 
   const SMARTLINK_URL = 'https://www.effectivecpmnetwork.com/hzn588p39q?key=c22e2da4de74dbe9769bd7bcc477bb63';
-  const SMARTLINK_URL2 = 'https://omg10.com/4/10302499';
 
   // ── স্টিকি বটম ব্যানার অ্যাড (নতুন, 320x50): প্রতিটা ভিডিও প্লেয়ার পেজে
   // স্ক্রিনের নিচ থেকে সামান্য উপরে ভেসে থাকবে। ক্রস (✕) বাটনে প্রথমবার
@@ -299,7 +224,7 @@ export default function VideoPage({ video, related, moreVideos }) {
 
   function handleStickyAdClose() {
     if (stickyAdClickRef.current === 0) {
-      window.open(SMARTLINK_URL2, '_blank');
+      window.open(SMARTLINK_URL, '_blank');
       stickyAdClickRef.current = 1;
     } else {
       setStickyAdVisible(false);
@@ -328,12 +253,12 @@ export default function VideoPage({ video, related, moreVideos }) {
 
   function handleDownloadClick(e) {
     e.preventDefault();
-    window.open(SMARTLINK_URL2, '_blank');
+    window.open(SMARTLINK_URL, '_blank');
   }
 
   function handleBackClick(e) {
     e.preventDefault();
-    window.open(SMARTLINK_URL2, '_blank');
+    window.open(SMARTLINK_URL, '_blank');
     setTimeout(() => { window.location.href = '/'; }, 50);
   }
 
@@ -456,40 +381,6 @@ atOptions = {
     iframe.srcdoc = html;
     container.appendChild(iframe);
   }, [video.id]);
-
-  // ── নতুন: ওপরের ব্যানার অ্যাডের (২c6dbe...) হুবহু কপি — related videos
-  // এর ৪০টাই (বা যত আছে) লোড হয়ে শেষ হলে (hasMoreToLoad = false) সবার
-  // নিচে আরেকবার একই এড বসানো হচ্ছে। ──
-  useEffect(() => {
-    if (hasMoreToLoad) return; // এখনো সব ভিডিও লোড শেষ হয়নি
-    const container = document.getElementById('native-banner-related-bottom');
-    if (!container || container.dataset.loaded) return;
-    container.dataset.loaded = 'true';
-
-    const iframe = document.createElement('iframe');
-    iframe.style.width = '728px';
-    iframe.style.height = '90px';
-    iframe.style.maxWidth = '100%';
-    iframe.style.border = '0';
-    iframe.style.overflow = 'hidden';
-    iframe.scrolling = 'no';
-
-    const html = `<!DOCTYPE html><html><head><style>html,body{margin:0;padding:0;overflow:hidden;}</style></head><body>
-<script type="text/javascript">
-atOptions = {
-  'key' : '2c6dbe338bfe942aba8e44ed0a288e48',
-  'format' : 'iframe',
-  'height' : 90,
-  'width' : 728,
-  'params' : {}
-};
-</script>
-<script type="text/javascript" src="https://www.highperformanceformat.com/2c6dbe338bfe942aba8e44ed0a288e48/invoke.js"></script>
-</body></html>`;
-
-    iframe.srcdoc = html;
-    container.appendChild(iframe);
-  }, [hasMoreToLoad, video.id]);
 
   // ── স্টিকি বটম ব্যানার অ্যাড (highperformanceformat, 320x50) ইনজেক্ট করা।
   // container সবসময় DOM-এ থাকে (শুধু CSS দিয়ে দেখানো/লুকানো হয়), তাই অ্যাডটা
@@ -687,13 +578,7 @@ atOptions = {
         <div className="player-layout">
           <div className="player-main">
             <div className="video-container">
-              {video.hlsPath ? (
-                // ── নিজের R2 (Cloudflare) থেকে ভিডিও — .m3u8 (HLS) বা
-                // .mp4/.webm যেটাই হোক, /api/video/... প্রোটেক্টেড প্রক্সি
-                // দিয়ে চলে। আসল R2 লিংক ব্রাউজারে কখনো দেখা যায় না, আর
-                // অন্য সাইট থেকে হটলিংক করলে 403 Forbidden হবে। ──
-                <ProtectedPlayer src={`/api/video/${video.hlsPath}`} />
-              ) : isDirectVideo ? (
+              {isDirectVideo ? (
                 <video controls autoPlay playsInline preload="metadata" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', background: '#000', objectFit: 'contain' }}>
                   <source src={video.videoUrl} type="video/mp4" />
                 </video>
@@ -868,12 +753,6 @@ atOptions = {
             রেন্ডার হবে না, তাই অযথা observe চলতে থাকবে না। */}
         {hasMoreToLoad && (
           <div ref={loadMoreRef} style={{ height: '40px' }}></div>
-        )}
-
-        {/* ── ৪০টা (বা যত আছে) related ভিডিও লোড শেষ হলে, সবার নিচে
-             ওপরের ব্যানার এডের একটা কপি আবার বসানো হচ্ছে। ── */}
-        {!hasMoreToLoad && (
-          <div style={{display:'flex',justifyContent:'center',margin:'1rem 0'}} id="native-banner-related-bottom"></div>
         )}
 
       </div>
