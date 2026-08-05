@@ -96,7 +96,7 @@ const SHEET_ID_SSR = '1CJU7TtQAvLGwVIrFB4G6uIyDy0m0Uz54kB6ZBpar4zE';
 function slugifySSR(text) {
   return text.toString().toLowerCase()
     .replace(/\s+/g, '-')
-    .replace(/[^\w-]/g, '')
+    .replace(/[^\w\u0980-\u09FF-]/g, '')
     .replace(/--+/g, '-')
     .replace(/^-+|-+$/g, '')
     .substring(0, 80);
