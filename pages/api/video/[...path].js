@@ -4,11 +4,15 @@
 // এই URL হিট করলে এই কোড রিফারার চেক করে এবং R2 থেকে ভিডিও এনে দেবে —
 // ব্রাউজারে আসল R2 লিংক প্রকাশ হবে না।
 
-// ── env var পড়ার জন্য: সাধারণত process.env.R2_PUBLIC_BASE_URL কাজ করা
-// উচিত (nodejs_compat flag চালু থাকলে Cloudflare এটা অটো পপুলেট করে),
-// কিন্তু কিছু কিছু ডিপ্লয়মেন্টে এটা ফাঁকা আসে। তাই getCloudflareContext()
-// দিয়ে সরাসরি Worker binding থেকেও একবার চেষ্টা করা হচ্ছে — যেটাতেই
-// ভ্যালু পাওয়া যায় সেটাই ব্যবহার হবে। ──
+// ── env var পড়ার জন্য: Cloudflare dashboard-এ সেট করা R2_PUBLIC_BASE_URL
+// বারবার দেখা গেছে process.env এবং getCloudflareContext() — কোনোটা দিয়েই
+// রিলায়েবলভাবে পাওয়া যাচ্ছে না (Cloudflare Worker রানটাইমের একটা পরিচিত
+// ঝামেলা)। যেহেতু এই URL আসলে গোপনীয় কিছু না — এটা এমনিতেই প্রতিটা
+// ভিডিও লিংকে প্রকাশ্যে থাকে — তাই একটা হার্ডকোডেড fallback রাখা হলো,
+// যাতে env var না পেলেও ভিডিও কখনো বন্ধ হয়ে না যায়। R2 বদলালে শুধু এই
+// একটা লাইন আপডেট করলেই হবে। ──
+const R2_BASE_FALLBACK = "https://pub-92d0155f51174f0ba870beb6301670d5.r2.dev";
+
 async function getR2Base() {
   const fromProcessEnv = process.env.R2_PUBLIC_BASE_URL;
   if (fromProcessEnv) return fromProcessEnv.trim();
@@ -22,7 +26,7 @@ async function getR2Base() {
     // getCloudflareContext লোকাল dev-এ বা edge না হলে fail করতে পারে, চুপচাপ ইগনোর
   }
 
-  return null;
+  return R2_BASE_FALLBACK;
 }
 
 export default async function handler(req, res) {
