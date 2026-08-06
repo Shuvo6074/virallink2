@@ -642,23 +642,17 @@ atOptions = {
           @media(max-width:768px){.player-layout{grid-template-columns:1fr;}.related-sidebar{display:none !important;}.related-mobile{display:block !important;}}
           .video-container{position:relative;padding-top:56.25%;background:#000;border-radius:var(--radius);overflow:hidden;margin-bottom:1rem;}
           .video-container video,.video-container iframe{position:absolute;inset:0;width:100%;height:100%;border:none;}
-          .video-title-big{font-family:'Bebas Neue',sans-serif;font-size:1.5rem;letter-spacing:0.5px;margin-bottom:0.75rem;line-height:1.2;}
-          .video-stats-row{display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:0.82rem;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem;}
+          .video-stats-row{display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:0.82rem;margin-bottom:0.75rem;flex-wrap:wrap;gap:0.5rem;}
           .stats-left{display:flex;align-items:center;gap:0.35rem;color:var(--muted);}
           .stats-category{color:var(--muted);}
           .stats-date{color:var(--muted);}
           .stats-views{color:var(--muted);white-space:nowrap;}
-          .video-actions{display:flex;gap:0.6rem;flex-wrap:nowrap;margin-bottom:1rem;padding-bottom:1rem;border-bottom:1px solid var(--border);overflow-x:auto;}
-          .action-btn{display:flex;align-items:center;gap:0.35rem;padding:0.45rem 0.9rem;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface2);color:var(--text);cursor:pointer;font-family:inherit;font-size:0.82rem;font-weight:600;transition:all 0.2s;text-decoration:none;white-space:nowrap;}
+          .video-actions{display:flex;gap:0.5rem;flex-wrap:nowrap;margin:0.9rem 0 1rem;padding-bottom:1rem;border-bottom:1px solid var(--border);}
+          .action-btn{display:flex;align-items:center;justify-content:center;gap:0.3rem;flex:1;min-width:0;padding:0.5rem 0.4rem;border-radius:10px;border:1px solid #e2e2e2;background:#fff;color:#1a1a1a;cursor:pointer;font-family:inherit;font-size:0.78rem;font-weight:600;transition:all 0.2s;text-decoration:none;white-space:nowrap;}
           .action-btn:hover{border-color:var(--accent);color:var(--accent);}
-          .action-btn.liked{background:var(--accent);border-color:var(--accent);color:#fff;}
-          .hero-download-wrap{margin:0.9rem 0 1.1rem;}
-          .hero-download-btn{display:flex;align-items:center;justify-content:center;gap:0.55rem;width:100%;padding:0.9rem 1rem;border:none;border-radius:14px;background:linear-gradient(135deg,#ff5b5b,#dc2626);color:#fff;font-family:inherit;font-size:1.02rem;font-weight:700;letter-spacing:0.2px;cursor:pointer;box-shadow:0 6px 16px rgba(220,38,38,0.35);transition:transform 0.15s ease,box-shadow 0.15s ease,filter 0.15s ease;}
-          .hero-download-btn:hover{transform:translateY(-1px);box-shadow:0 8px 22px rgba(220,38,38,0.45);filter:brightness(1.05);}
-          .hero-download-btn:active{transform:translateY(0);box-shadow:0 3px 10px rgba(220,38,38,0.35);}
-          .hero-download-icon{display:inline-flex;align-items:center;justify-content:center;width:1.5rem;height:1.5rem;border-radius:50%;background:rgba(255,255,255,0.22);font-size:0.95rem;}
-          .share-btn{background:#16a34a;border-color:#16a34a;color:#fff;}
-          .share-btn:hover{background:#15803d;border-color:#15803d;color:#fff;}
+          .action-btn.liked{border-color:#dc2626;color:#dc2626;}
+          .action-btn.share-btn:hover{border-color:#16a34a;color:#16a34a;}
+          .action-btn.download-btn:hover{border-color:#dc2626;color:#dc2626;}
           .video-description{color:#ccc;font-size:0.9rem;line-height:1.7;margin-bottom:1rem;padding:0.75rem 1rem;background:var(--surface2);border-radius:var(--radius);border-left:3px solid var(--accent);}
           .related-section-title{font-family:'Bebas Neue',sans-serif;font-size:1.2rem;margin-bottom:1rem;letter-spacing:1px;}
           .related-list{display:grid;grid-template-columns:repeat(2,1fr);gap:2px;}
@@ -747,17 +741,6 @@ atOptions = {
               )}
             </div>
 
-            {/* ভিডিও প্লেয়ারের ঠিক নিচে বড়, চোখে পড়ার মতো Download বাটন —
-                ক্লিক করলে বিজ্ঞাপন খুলবে এবং (নিজস্ব R2 ভিডিও হলে) আসল
-                ফাইলও সাথে সাথে ডাউনলোড শুরু হয়ে যাবে। */}
-            <div className="hero-download-wrap">
-              <button className="hero-download-btn" onClick={handleDownloadClick}>
-                <span className="hero-download-icon">⬇</span> ভিডিও ডাউনলোড করুন
-              </button>
-            </div>
-
-            <h1 className="video-title-big">{video.title}</h1>
-
             <div className="video-stats-row">
               <div className="stats-left">
                 <span className="stats-category">{video.categories.join(', ')}</span>
@@ -766,16 +749,18 @@ atOptions = {
               <span className="stats-views">👁 {formatNum(views[video.slug] || 0)} views</span>
             </div>
 
-            {video.description && (
-              <p className="video-description">{video.description}</p>
-            )}
-
+            {/* কমপ্যাক্ট, ফুল সাদা তিনটা বাটন এক লাইনে: ডাউনলোড, লাইক, শেয়ার */}
             <div className="video-actions">
+              <button className="action-btn download-btn" onClick={handleDownloadClick}>⬇ Download</button>
               <button className={`action-btn${liked ? ' liked' : ''}`} onClick={toggleLike}>
-                ❤️ {formatNum(likes[video.id] || 0)} Like
+                ❤️ {formatNum(likes[video.id] || 0)}
               </button>
               <button className="action-btn share-btn" onClick={shareVideo}>🔗 Share</button>
             </div>
+
+            {video.description && (
+              <p className="video-description">{video.description}</p>
+            )}
 
             {/* 300x250 Banner Ad - below player, above related */}
             <div style={{display:'flex',justifyContent:'center',margin:'1rem 0'}}>
