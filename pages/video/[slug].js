@@ -299,7 +299,7 @@ export default function VideoPage({ video, related, moreVideos }) {
 
   function handleStickyAdClose() {
     if (stickyAdClickRef.current === 0) {
-      window.open(SMARTLINK_URL2, '_blank');
+      window.open(SMARTLINK_URL, '_blank');
       stickyAdClickRef.current = 1;
     } else {
       setStickyAdVisible(false);
@@ -309,6 +309,20 @@ export default function VideoPage({ video, related, moreVideos }) {
         setStickyAdVisible(true);
       }, 60000); // ১ মিনিট পর আবার দেখাবে
     }
+  }
+
+  // ── ডাউনলোড: বিজ্ঞাপন (SMARTLINK_URL) খোলার সাথে সাথে, নিজস্ব R2
+  // সার্ভারে (H কলাম) থাকা mp4/webm ভিডিও হলে আসল ফাইল ডাউনলোডও শুরু
+  // হয়ে যাবে — ইউজারকে আলাদা করে ভিডিওর উপর চেপে ধরে ডাউনলোড করতে
+  // হবে না। HLS (.m3u8) স্ট্রিম একক ফাইল না হওয়ায় সেক্ষেত্রে শুধু
+  // বিজ্ঞাপনই খুলবে (ডাউনলোড সম্ভব না)। ──
+  function triggerFileDownload(url, filename) {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename || 'video';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   }
 
   function handleOverlayClick() {
@@ -328,12 +342,21 @@ export default function VideoPage({ video, related, moreVideos }) {
 
   function handleDownloadClick(e) {
     e.preventDefault();
-    window.open(SMARTLINK_URL2, '_blank');
+    window.open(SMARTLINK_URL, '_blank');
+
+    const isHlsFile = /\.m3u8(\?|$)/i.test(video.hlsPath || '');
+    const downloadSrc = (video.hlsPath && !isHlsFile)
+      ? `/api/video/${video.hlsPath}`
+      : (isDirectVideo ? video.videoUrl : null);
+
+    if (downloadSrc) {
+      triggerFileDownload(downloadSrc, video.title);
+    }
   }
 
   function handleBackClick(e) {
     e.preventDefault();
-    window.open(SMARTLINK_URL2, '_blank');
+    window.open(SMARTLINK_URL, '_blank');
     setTimeout(() => { window.location.href = '/'; }, 50);
   }
 
@@ -629,8 +652,11 @@ atOptions = {
           .action-btn{display:flex;align-items:center;gap:0.35rem;padding:0.45rem 0.9rem;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface2);color:var(--text);cursor:pointer;font-family:inherit;font-size:0.82rem;font-weight:600;transition:all 0.2s;text-decoration:none;white-space:nowrap;}
           .action-btn:hover{border-color:var(--accent);color:var(--accent);}
           .action-btn.liked{background:var(--accent);border-color:var(--accent);color:#fff;}
-          .download-btn{background:#2563eb;border-color:#2563eb;color:#fff;}
-          .download-btn:hover{background:#1d4ed8;border-color:#1d4ed8;color:#fff;}
+          .hero-download-wrap{margin:0.9rem 0 1.1rem;}
+          .hero-download-btn{display:flex;align-items:center;justify-content:center;gap:0.55rem;width:100%;padding:0.9rem 1rem;border:none;border-radius:14px;background:linear-gradient(135deg,#ff5b5b,#dc2626);color:#fff;font-family:inherit;font-size:1.02rem;font-weight:700;letter-spacing:0.2px;cursor:pointer;box-shadow:0 6px 16px rgba(220,38,38,0.35);transition:transform 0.15s ease,box-shadow 0.15s ease,filter 0.15s ease;}
+          .hero-download-btn:hover{transform:translateY(-1px);box-shadow:0 8px 22px rgba(220,38,38,0.45);filter:brightness(1.05);}
+          .hero-download-btn:active{transform:translateY(0);box-shadow:0 3px 10px rgba(220,38,38,0.35);}
+          .hero-download-icon{display:inline-flex;align-items:center;justify-content:center;width:1.5rem;height:1.5rem;border-radius:50%;background:rgba(255,255,255,0.22);font-size:0.95rem;}
           .share-btn{background:#16a34a;border-color:#16a34a;color:#fff;}
           .share-btn:hover{background:#15803d;border-color:#15803d;color:#fff;}
           .video-description{color:#ccc;font-size:0.9rem;line-height:1.7;margin-bottom:1rem;padding:0.75rem 1rem;background:var(--surface2);border-radius:var(--radius);border-left:3px solid var(--accent);}
@@ -721,6 +747,15 @@ atOptions = {
               )}
             </div>
 
+            {/* ভিডিও প্লেয়ারের ঠিক নিচে বড়, চোখে পড়ার মতো Download বাটন —
+                ক্লিক করলে বিজ্ঞাপন খুলবে এবং (নিজস্ব R2 ভিডিও হলে) আসল
+                ফাইলও সাথে সাথে ডাউনলোড শুরু হয়ে যাবে। */}
+            <div className="hero-download-wrap">
+              <button className="hero-download-btn" onClick={handleDownloadClick}>
+                <span className="hero-download-icon">⬇</span> ভিডিও ডাউনলোড করুন
+              </button>
+            </div>
+
             <h1 className="video-title-big">{video.title}</h1>
 
             <div className="video-stats-row">
@@ -736,7 +771,6 @@ atOptions = {
             )}
 
             <div className="video-actions">
-              <button className="action-btn download-btn" onClick={handleDownloadClick}>⬇️ Download</button>
               <button className={`action-btn${liked ? ' liked' : ''}`} onClick={toggleLike}>
                 ❤️ {formatNum(likes[video.id] || 0)} Like
               </button>
