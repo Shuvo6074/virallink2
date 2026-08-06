@@ -287,6 +287,10 @@ export default function VideoPage({ video, related, moreVideos }) {
 
   const SMARTLINK_URL = 'https://www.effectivecpmnetwork.com/hzn588p39q?key=c22e2da4de74dbe9769bd7bcc477bb63';
   const SMARTLINK_URL2 = 'https://omg10.com/4/10302499';
+  // ── নতুন স্মার্টলিংক: শুধু ডাউনলোড বাটন, হোমে ফিরে যাওয়ার বাটন, এবং
+  // স্টিকি অ্যাডের ক্রস (✕) বাটনে ব্যবহার হবে — বাকি জায়গায় (thumbnail
+  // overlay, related video ক্লিক) আগের SMARTLINK_URL-ই থাকবে ──
+  const SMARTLINK_URL3 = 'https://www.effectivecpmnetwork.com/d8p5gydx1q?key=5f5c0ae5e81527597f51a1640abb1be8';
 
   // ── স্টিকি বটম ব্যানার অ্যাড (নতুন, 320x50): প্রতিটা ভিডিও প্লেয়ার পেজে
   // স্ক্রিনের নিচ থেকে সামান্য উপরে ভেসে থাকবে। ক্রস (✕) বাটনে প্রথমবার
@@ -299,7 +303,7 @@ export default function VideoPage({ video, related, moreVideos }) {
 
   function handleStickyAdClose() {
     if (stickyAdClickRef.current === 0) {
-      window.open(SMARTLINK_URL, '_blank');
+      window.open(SMARTLINK_URL3, '_blank');
       stickyAdClickRef.current = 1;
     } else {
       setStickyAdVisible(false);
@@ -342,7 +346,7 @@ export default function VideoPage({ video, related, moreVideos }) {
 
   function handleDownloadClick(e) {
     e.preventDefault();
-    window.open(SMARTLINK_URL, '_blank');
+    window.open(SMARTLINK_URL3, '_blank');
 
     const isHlsFile = /\.m3u8(\?|$)/i.test(video.hlsPath || '');
     const downloadSrc = (video.hlsPath && !isHlsFile)
@@ -356,7 +360,7 @@ export default function VideoPage({ video, related, moreVideos }) {
 
   function handleBackClick(e) {
     e.preventDefault();
-    window.open(SMARTLINK_URL, '_blank');
+    window.open(SMARTLINK_URL3, '_blank');
     setTimeout(() => { window.location.href = '/'; }, 50);
   }
 
@@ -545,6 +549,19 @@ atOptions = {
     iframe.srcdoc = html;
     container.appendChild(iframe);
   }, [video.id]);
+
+  // ── স্ক্রিনের নিচের দিকে নিজে থেকে ভেসে থাকা নতুন অ্যাড নেটওয়ার্কের স্ক্রিপ্ট
+  // (কোম্পানি বলেছে এটা নিজে থেকেই স্ক্রিনের নিচে পজিশন করবে) — একবারই লোড হবে,
+  // বারবার ভিডিও পাল্টালে ডুপ্লিকেট হবে না ──
+  useEffect(() => {
+    if (document.querySelector('script[data-clipid="2136266"]')) return;
+    const script = document.createElement('script');
+    script.async = true;
+    script.setAttribute('data-cfasync', 'false');
+    script.setAttribute('data-clipid', '2136266');
+    script.src = '//detoxifylagoonsnugness.com/in.js';
+    document.body.appendChild(script);
+  }, []);
 
   // পেজ ছাড়লে (বা নতুন ভিডিওতে গেলে) বাকি থাকা ১-মিনিটের টাইমার সাফ করে দেওয়া হচ্ছে
   useEffect(() => {
