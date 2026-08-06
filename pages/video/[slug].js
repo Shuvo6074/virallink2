@@ -648,7 +648,7 @@ atOptions = {
           .stats-date{color:var(--muted);}
           .stats-views{color:var(--muted);white-space:nowrap;}
           .video-actions{display:flex;gap:0.5rem;flex-wrap:nowrap;margin:0.9rem 0 1rem;padding-bottom:1rem;border-bottom:1px solid var(--border);}
-          .action-btn{display:flex;align-items:center;justify-content:center;gap:0.3rem;flex:1;min-width:0;padding:0.5rem 0.4rem;border-radius:10px;border:1px solid #e2e2e2;background:#fff;color:#1a1a1a;cursor:pointer;font-family:inherit;font-size:0.78rem;font-weight:600;transition:all 0.2s;text-decoration:none;white-space:nowrap;}
+          .action-btn{display:flex;align-items:center;justify-content:center;gap:0.3rem;flex:1;min-width:0;padding:0.55rem 0.4rem;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);cursor:pointer;font-family:inherit;font-size:0.78rem;font-weight:600;transition:all 0.2s;text-decoration:none;white-space:nowrap;}
           .action-btn:hover{border-color:var(--accent);color:var(--accent);}
           .action-btn.liked{border-color:#dc2626;color:#dc2626;}
           .action-btn.share-btn:hover{border-color:#16a34a;color:#16a34a;}
