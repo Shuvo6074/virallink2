@@ -1,46 +1,61 @@
 // ফাইলের পাথ: pages/api/video/[...path].js
 //
 // ব্যবহার: https://virallink2.site/api/video/videos/<slug>/master.m3u8
-// এই URL হিট করলে এই কোড রিফারার চেক করে এবং R2 থেকে ভিডিও এনে দেবে —
-// ব্রাউজারে আসল R2 লিংক প্রকাশ হবে না।
+//
+// ── বড় পরিবর্তন (আপডেট) ──
+// আগে এই রুট R2 থেকে পুরো ফাইল টেনে এনে Worker দিয়ে chunk-by-chunk
+// স্ট্রিম করে ইউজারকে পাঠাত। এতে দুইটা সমস্যা হচ্ছিল:
+//   ১) বড় ভিডিও ফাইলে Cloudflare Worker-এর CPU/resource limit ক্রস হয়ে
+//      "Error 1102: Worker exceeded resource limits" — পুরো সাইট ডাউন
+//      দেখাচ্ছিল।
+//   ২) ডাউনলোড মাঝপথে কেটে গিয়ে অসম্পূর্ণ/করাপ্ট ফাইল সেভ হচ্ছিল
+//      (ব্রাউজারে "ভিডিও নাই" এমন একটা ছোট ফাইল হিসেবে দেখা যাচ্ছিল)।
+//
+// এখন সমাধান: Worker নিজে ফাইল টেনে আনে না। বরং R2-এর S3-compatible
+// API দিয়ে একটা সাময়িক (short-lived) সাইনড URL বানিয়ে ব্রাউজারকে
+// সরাসরি R2-তে 302 redirect করে দেয়। এতে:
+//   - Worker-এর কাজ মাত্র কয়েক মিলিসেকেন্ডের (শুধু sign করা), তাই
+//     resource limit ক্রস হওয়ার প্রশ্নই নেই।
+//   - ব্রাউজার নিজে R2 থেকে সরাসরি ফুল-স্পিডে ডাউনলোড/স্ট্রিম করে,
+//     কোনো মাঝপথে কাটাকাটি হয় না।
+//   - লিংকটা মাত্র কিছুক্ষণ (নিচে EXPIRES_IN_SECONDS) ভ্যালিড থাকে,
+//     তাই কেউ নেটওয়ার্ক ট্যাব থেকে কপি করলেও পরে সেটা কাজ করবে না —
+//     হটলিংক/চুরি ঠেকানো যায়।
+//   - Referer চেক আগের মতোই আছে — অন্য সাইট থেকে রিকোয়েস্ট এলে সাইনড
+//     URL-ই জেনারেট হবে না।
+//
+// প্রয়োজনীয় env vars (Cloudflare Pages → Settings → Variables and secrets):
+//   R2_ACCOUNT_ID        (Secret)
+//   R2_ACCESS_KEY_ID     (Secret)
+//   R2_SECRET_ACCESS_KEY (Secret)
+//   R2_BUCKET_NAME       (Text)  — এখানে "v2-videos"
 
-// ── env var পড়ার জন্য: Cloudflare dashboard-এ সেট করা R2_PUBLIC_BASE_URL
-// বারবার দেখা গেছে process.env এবং getCloudflareContext() — কোনোটা দিয়েই
-// রিলায়েবলভাবে পাওয়া যাচ্ছে না (Cloudflare Worker রানটাইমের একটা পরিচিত
-// ঝামেলা)। যেহেতু এই URL আসলে গোপনীয় কিছু না — এটা এমনিতেই প্রতিটা
-// ভিডিও লিংকে প্রকাশ্যে থাকে — তাই একটা হার্ডকোডেড fallback রাখা হলো,
-// যাতে env var না পেলেও ভিডিও কখনো বন্ধ হয়ে না যায়। R2 বদলালে শুধু এই
-// একটা লাইন আপডেট করলেই হবে। ──
-const R2_BASE_FALLBACK = "https://pub-92d0155f51174f0ba870beb6301670d5.r2.dev";
+import { AwsClient } from "aws4fetch";
 
-async function getR2Base() {
-  const fromProcessEnv = process.env.R2_PUBLIC_BASE_URL;
-  if (fromProcessEnv) return fromProcessEnv.trim();
+// সাইনড URL কতক্ষণ ভ্যালিড থাকবে (সেকেন্ডে)। ১২০ সেকেন্ড = ২ মিনিট —
+// এতটুকু সময় স্ট্রিমিং/ডাউনলোড শুরু করার জন্য যথেষ্ট, কিন্তু লিংক কপি
+// করে পরে ব্যবহার করার মতো দীর্ঘ না।
+const EXPIRES_IN_SECONDS = 120;
 
+async function getEnv(req) {
+  // Cloudflare Pages Functions (via @opennextjs/cloudflare) রানটাইমে env
+  // পাওয়ার সবচেয়ে রিলায়েবল উপায় getCloudflareContext — process.env
+  // মাঝে মাঝে undefined আসে (আগের মন্তব্যেও এই সমস্যার কথা লেখা ছিল)।
   try {
     const { getCloudflareContext } = await import("@opennextjs/cloudflare");
     const ctx = await getCloudflareContext({ async: true });
-    const fromBinding = ctx?.env?.R2_PUBLIC_BASE_URL;
-    if (fromBinding) return fromBinding.trim();
+    if (ctx?.env?.R2_ACCOUNT_ID) return ctx.env;
   } catch (e) {
-    // getCloudflareContext লোকাল dev-এ বা edge না হলে fail করতে পারে, চুপচাপ ইগনোর
+    // লোকাল dev-এ বা edge না হলে fail করতে পারে, চুপচাপ ইগনোর
   }
-
-  return R2_BASE_FALLBACK;
+  return process.env;
 }
 
 export default async function handler(req, res) {
   const pathSegments = req.query.path || [];
   const path = Array.isArray(pathSegments) ? pathSegments.join("/") : pathSegments;
 
-  const R2_BASE = await getR2Base();
-
-  if (!R2_BASE) {
-    res.status(500).send("Server misconfigured");
-    return;
-  }
-
-  // ---- Referer চেক (হটলিংক প্রোটেকশন) ----
+  // ---- Referer চেক (হটলিংক প্রোটেকশন) — আগের মতোই ----
   const referer = req.headers.referer || "";
   const allowedHosts = ["virallink2.site"]; // bd-viral-hub এর হোস্ট এখানে অ্যাড করতে পারেন
 
@@ -60,59 +75,46 @@ export default async function handler(req, res) {
     return;
   }
 
-  // ---- আসল R2 URL থেকে ফাইল আনা (সার্ভার-সাইড) ----
-  // ব্রাউজার ভিডিওর মাঝখানে ক্লিক করে সিক (scrub/seek) করলে "Range" header
-  // পাঠায় — সেটা R2-তে ফরওয়ার্ড না করলে প্রতিবার পুরো ফাইল আবার লোড করতে
-  // হবে, স্লো হবে ও বড় ফাইলে Worker টাইমআউট/মেমোরি এরর হতে পারে। তাই
-  // Range header যদি থাকে সেটা upstream fetch-এ পাঠানো হচ্ছে, এবং উত্তরে
-  // 206 Partial Content + Content-Range ফিরিয়ে দেওয়া হচ্ছে।
-  const upstreamUrl = `${R2_BASE}/${path}`;
-  const rangeHeader = req.headers.range;
-  const upstreamRes = await fetch(upstreamUrl, {
-    headers: rangeHeader ? { Range: rangeHeader } : {},
-  });
+  const env = await getEnv(req);
+  const accountId = env.R2_ACCOUNT_ID;
+  const accessKeyId = env.R2_ACCESS_KEY_ID;
+  const secretAccessKey = env.R2_SECRET_ACCESS_KEY;
+  const bucketName = env.R2_BUCKET_NAME;
 
-  if (!upstreamRes.ok && upstreamRes.status !== 206) {
-    res.status(upstreamRes.status === 404 ? 404 : 502).send("Not found");
+  if (!accountId || !accessKeyId || !secretAccessKey || !bucketName) {
+    res.status(500).send("Server misconfigured");
     return;
   }
 
-  if (path.endsWith(".m3u8")) {
-    res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
-  } else if (path.endsWith(".ts")) {
-    res.setHeader("Content-Type", "video/mp2t");
-  } else {
-    res.setHeader(
-      "Content-Type",
-      upstreamRes.headers.get("content-type") || "application/octet-stream"
+  try {
+    const client = new AwsClient({
+      accessKeyId,
+      secretAccessKey,
+      service: "s3",
+      region: "auto",
+    });
+
+    // R2-এর S3 API এন্ডপয়েন্ট — বাকেটের নির্দিষ্ট অবজেক্টের জন্য
+    const endpoint = `https://${accountId}.r2.cloudflarestorage.com/${bucketName}/${path}`;
+
+    const url = new URL(endpoint);
+    url.searchParams.set("X-Amz-Expires", String(EXPIRES_IN_SECONDS));
+
+    // aws4fetch দিয়ে presigned URL বানানো (query-string sign করা GET রিকোয়েস্ট)
+    const signedRequest = await client.sign(
+      new Request(url.toString(), { method: "GET" }),
+      { aws: { signQuery: true } }
     );
-  }
-  res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-  res.setHeader("Accept-Ranges", "bytes");
 
-  const contentRange = upstreamRes.headers.get("content-range");
-  if (contentRange) res.setHeader("Content-Range", contentRange);
+    const signedUrl = signedRequest.url;
 
-  const contentLength = upstreamRes.headers.get("content-length");
-  if (contentLength) res.setHeader("Content-Length", contentLength);
-
-  res.status(upstreamRes.status); // 200 (পুরো ফাইল) অথবা 206 (partial/seek)
-
-  // ── পুরো ফাইল একসাথে মেমোরিতে না নিয়ে চাংক-বাই-চাংক স্ট্রিম করা হচ্ছে,
-  // যাতে বড় ভিডিওতেও Worker মেমোরি/সময় সীমার মধ্যে থাকে। ──
-  if (upstreamRes.body) {
-    const reader = upstreamRes.body.getReader();
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        res.write(Buffer.from(value));
-      }
-    } finally {
-      res.end();
-    }
-  } else {
-    const buffer = Buffer.from(await upstreamRes.arrayBuffer());
-    res.end(buffer);
+    // ---- ব্রাউজারকে সরাসরি R2-এর সাইনড URL-এ পাঠিয়ে দেওয়া হচ্ছে ----
+    // 302 (temporary redirect) — Worker নিজে ফাইল টাচ করছে না, তাই
+    // resource limit ক্রস হওয়ার সুযোগ নেই।
+    res.setHeader("Cache-Control", "private, no-store"); // সাইনড URL কখনো cache হওয়া উচিত না
+    res.writeHead(302, { Location: signedUrl });
+    res.end();
+  } catch (err) {
+    res.status(502).send("Failed to generate video link");
   }
 }
