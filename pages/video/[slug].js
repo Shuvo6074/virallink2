@@ -71,6 +71,18 @@ function timeAgo(dateStr) {
   return `${diffYr} year${diffYr === 1 ? '' : 's'} ago`;
 }
 
+// ── নতুন: schema.org VideoObject-এর uploadDate ফিল্ডের জন্য পুরো ISO 8601
+// ফরম্যাট (সময় + timezone সহ) বানায়, যেমন "2026-07-29T00:00:00+06:00"।
+// GSC "missing a time zone" warning ঠিক করতে এটা যোগ করা হলো — Bangladesh
+// সবসময় UTC+6 (কোনো DST নেই), তাই অফসেট ফিক্সড রাখা নিরাপদ। ──
+function formatIso8601BD(date) {
+  const pad = n => String(n).padStart(2, '0');
+  const y = date.getFullYear();
+  const mo = pad(date.getMonth() + 1);
+  const d = pad(date.getDate());
+  return `${y}-${mo}-${d}T00:00:00+06:00`;
+}
+
 // ── থাম্বনেইল ফিক্স (আপডেট): index.js-এর মতোই — postimg.cc লিংকের জন্য
 // প্রক্সি বাদ দিয়ে সরাসরি URL ব্যবহার করা হচ্ছে, কারণ wsrv.nl একসাথে
 // অনেক রিকোয়েস্ট পেলে rate-limit/timeout করে ফেলছিল (প্রথমবার কালো
@@ -602,11 +614,11 @@ atOptions = {
     "name": video.title,
     "description": video.description || video.title,
     "thumbnailUrl": video.thumbnail,
-    // ⚠️ ফিক্স: আগে video.date-এর raw স্ট্রিং (যেমন "07/31/2026") সরাসরি বসে যেত,
-    // যেটা ISO 8601 ফরম্যাট না হওয়ায় Google Search Console "Date/time not in
-    // ISO 8601 format" এরর দিচ্ছিল। এখন parseSheetDate() দিয়ে প্রথমে সঠিকভাবে
-    // পার্স করে, তারপর .toISOString() দিয়ে সবসময় "YYYY-MM-DD" ফরম্যাটে বসানো হচ্ছে।
-    "uploadDate": (parseSheetDate(video.date) || new Date()).toISOString().split('T')[0],
+    // ⚠️ ফিক্স (আপডেট): আগে শুধু "YYYY-MM-DD" (তারিখ, সময়/timezone ছাড়া) বসছিল,
+    // যেটার জন্য GSC "Datetime property 'uploadDate' is missing a time zone"
+    // warning দিচ্ছিল। এখন সময় "00:00:00" আর বাংলাদেশের timezone অফসেট "+06:00"
+    // যোগ করে পুরো ISO 8601 ফরম্যাটে বসানো হচ্ছে, যেমন: "2026-07-29T00:00:00+06:00"।
+    "uploadDate": formatIso8601BD(parseSheetDate(video.date) || new Date()),
     "contentUrl": video.videoUrl,
     "embedUrl": pageUrl,
     "publisher": { "@type": "Organization", "name": "ViralLink BD", "url": SITE_URL }
