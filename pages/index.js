@@ -4,6 +4,10 @@ import Head from "next/head";
 const SHEET_ID = '1CJU7TtQAvLGwVIrFB4G6uIyDy0m0Uz54kB6ZBpar4zE';
 const PER_PAGE = 30;
 
+// ── ভিডিও কার্ডে ক্লিক করলেই এই SmartLink নতুন ট্যাবে খুলবে (প্রতি ক্লিকেই,
+// কোনো frequency cap ছাড়া) — লিংক বদলাতে হলে শুধু এই ভ্যারিয়েবলটা বদলালেই হবে ──
+const SMARTLINK_URL = 'https://www.effectivecpmnetwork.com/hzn588p39q?key=c22e2da4de74dbe9769bd7bcc477bb63';
+
 function slugify(text) {
   return text.toString().toLowerCase()
     .replace(/\s+/g, '-')
@@ -350,7 +354,20 @@ atOptions = {'key':'${key}','format':'iframe','height':${height},'width':${width
               <div className="empty">🎬 No videos found.</div>
             ) : paginated.map((v, i) => (
               <React.Fragment key={v.id}>
-                <a className="video-card" href={`/video/${v.slug}`}>
+                <a
+                  className="video-card"
+                  href={`/video/${v.slug}`}
+                  onClick={() => {
+                    // ── SmartLink নতুন ট্যাবে খুলবে, কিন্তু সাথে সাথেই সেটাকে
+                    // .blur() করে ব্যাকগ্রাউন্ডে পাঠিয়ে window.focus() দিয়ে
+                    // মূল ট্যাবে ফোকাস ফিরিয়ে আনা হচ্ছে — এতে ইউজার অ্যাডের
+                    // ট্যাবে না গিয়ে সরাসরি এই ট্যাবেই video player পেজে
+                    // চলে যাবে, আর SmartLink পিছনে (ব্যাকগ্রাউন্ডে) থেকে যাবে ──
+                    const adTab = window.open(SMARTLINK_URL, '_blank');
+                    if (adTab) adTab.blur();
+                    window.focus();
+                  }}
+                >
                   <div className="thumb-wrap">
                     <img
                       src={thumbUrl(v.thumbnail, 400)}
