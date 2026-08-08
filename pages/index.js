@@ -6,7 +6,7 @@ const PER_PAGE = 30;
 
 // ── ভিডিও কার্ডে ক্লিক করলেই এই SmartLink নতুন ট্যাবে খুলবে (প্রতি ক্লিকেই,
 // কোনো frequency cap ছাড়া) — লিংক বদলাতে হলে শুধু এই ভ্যারিয়েবলটা বদলালেই হবে ──
-const SMARTLINK_URL = 'https://www.effectivecpmnetwork.com/hzn588p39q?key=c22e2da4de74dbe9769bd7bcc477bb63';
+const SMARTLINK_URL = 'https://www.effectivecpmnetwork.com/c2sf8tayk?key=984425aa15cb3a2477cbdb8098fbf9ff';
 
 function slugify(text) {
   return text.toString().toLowerCase()
