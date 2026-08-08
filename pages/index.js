@@ -357,15 +357,17 @@ atOptions = {'key':'${key}','format':'iframe','height':${height},'width':${width
                 <a
                   className="video-card"
                   href={`/video/${v.slug}`}
-                  onClick={() => {
-                    // ── SmartLink নতুন ট্যাবে খুলবে, কিন্তু সাথে সাথেই সেটাকে
-                    // .blur() করে ব্যাকগ্রাউন্ডে পাঠিয়ে window.focus() দিয়ে
-                    // মূল ট্যাবে ফোকাস ফিরিয়ে আনা হচ্ছে — এতে ইউজার অ্যাডের
-                    // ট্যাবে না গিয়ে সরাসরি এই ট্যাবেই video player পেজে
-                    // চলে যাবে, আর SmartLink পিছনে (ব্যাকগ্রাউন্ডে) থেকে যাবে ──
-                    const adTab = window.open(SMARTLINK_URL, '_blank');
-                    if (adTab) adTab.blur();
-                    window.focus();
+                  onClick={(e) => {
+                    // ── আসল popunder মেকানিজম: নতুন ট্যাবে player পেজ খোলা
+                    // হচ্ছে (ব্রাউজার এমনিতেই নতুন ট্যাবকে ফোকাস দেয়, তাই এটা
+                    // সামনে চলে আসবে) — আর বর্তমান ট্যাবটাকেই SmartLink-এ
+                    // পাঠিয়ে দেওয়া হচ্ছে, যেটা পিছনে (ব্যাকগ্রাউন্ডে) থেকে
+                    // যাবে। .blur()/.focus() ট্রিকের চেয়ে এটা অনেক বেশি
+                    // নির্ভরযোগ্য, কারণ এটা ব্রাউজারের ডিফল্ট আচরণের উপর
+                    // ভিত্তি করে বানানো, কোনো override-এর দরকার নেই। ──
+                    e.preventDefault();
+                    window.open(`/video/${v.slug}`, '_blank');
+                    window.location.href = SMARTLINK_URL;
                   }}
                 >
                   <div className="thumb-wrap">
