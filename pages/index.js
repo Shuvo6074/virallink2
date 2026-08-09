@@ -74,16 +74,14 @@ function timeAgo(dateStr) {
   return `${diffYr} year${diffYr === 1 ? '' : 's'} ago`;
 }
 
-// ── থাম্বনেইল ফিক্স (আপডেট ২): postimg.cc-ও এখন স্লো পাওয়া যাচ্ছে, তাই
-// আর কোনো সোর্সকে বাইপাস না করে — সব ইমেজই wsrv.nl প্রক্সি দিয়ে resize+
-// compress করে সার্ভ করা হচ্ছে। আগের rate-limit সমস্যা এড়াতে গ্রিডের
-// width কমানো হয়েছে (400 → 300) এবং eager-load সংখ্যা কমানো হয়েছে
-// (6 → 4নীচে) — একসাথে কম রিকোয়েস্ট গেলে wsrv timeout করার সম্ভাবনা কমে।
-// প্রতিটা রিকোয়েস্টে n=-1 (queue না করে সরাসরি fetch) যোগ করা হয়েছে। ──
+// ── থাম্বনেইল ফিক্স (আপডেট ৩): আগের সেটিং (w=300, q=72) সাইজে খুব ছোট
+// হয়ে যাচ্ছিল, তাই মোবাইলের হাই-রেজোলিউশন স্ক্রিনে ঝাপসা/লো-কোয়ালিটি
+// দেখাচ্ছিল। width আর quality বাড়িয়ে HD-এর কাছাকাছি আনা হলো, তাও
+// original raw ছবির চেয়ে এখনো অনেক হালকা (webp + compress আছে)। ──
 function thumbUrl(url, width) {
   if (!url) return url;
   const clean = url.replace(/^https?:\/\//, '');
-  return `https://wsrv.nl/?url=${encodeURIComponent(clean)}&w=${width}&q=72&output=webp&n=-1`;
+  return `https://wsrv.nl/?url=${encodeURIComponent(clean)}&w=${width}&q=85&output=webp&n=-1`;
 }
 
 // একটা ভিডিও একাধিক ক্যাটাগরিতে থাকতে পারবে — Sheets-এ কমা (,) দিয়ে
@@ -370,7 +368,7 @@ atOptions = {'key':'${key}','format':'iframe','height':${height},'width':${width
                 >
                   <div className="thumb-wrap">
                     <img
-                      src={thumbUrl(v.thumbnail, 300)}
+                      src={thumbUrl(v.thumbnail, 480)}
                       alt={`${v.title} - ভাইরাল ভিডিও বাংলাদেশ`}
                       loading={i < 4 ? 'eager' : 'lazy'}
                       decoding="async"
