@@ -74,18 +74,16 @@ function timeAgo(dateStr) {
   return `${diffYr} year${diffYr === 1 ? '' : 's'} ago`;
 }
 
-// ── থাম্বনেইল ফিক্স (আপডেট): wsrv.nl প্রক্সি একসাথে অনেক (৩০টা) রিকোয়েস্ট
-// পেলে rate-limit/timeout করে ফেলছিল — এই কারণেই প্রথমবার পেজ লোডে থাম্বনেইল
-// কালো দেখাচ্ছিল, আর রিলোড দিলে ঠিক হয়ে যাচ্ছিল (ততক্ষণে wsrv নিজে ক্যাশ
-// করে ফেলত)। যেহেতু তোমার থাম্বনেইল মূলত postimg.cc-তে থাকে, আর postimg.cc
-// নিজেই একটা ফাস্ট, hotlink-friendly CDN — postimg লিংকের জন্য প্রক্সি
-// পুরোপুরি বাদ দিয়ে সরাসরি URL ব্যবহার করা হচ্ছে। অন্য কোনো সোর্স
-// (picsum ইত্যাদি) হলে তখনই শুধু wsrv.nl ব্যবহার হবে। ──
+// ── থাম্বনেইল ফিক্স (আপডেট ২): postimg.cc-ও এখন স্লো পাওয়া যাচ্ছে, তাই
+// আর কোনো সোর্সকে বাইপাস না করে — সব ইমেজই wsrv.nl প্রক্সি দিয়ে resize+
+// compress করে সার্ভ করা হচ্ছে। আগের rate-limit সমস্যা এড়াতে গ্রিডের
+// width কমানো হয়েছে (400 → 300) এবং eager-load সংখ্যা কমানো হয়েছে
+// (6 → 4নীচে) — একসাথে কম রিকোয়েস্ট গেলে wsrv timeout করার সম্ভাবনা কমে।
+// প্রতিটা রিকোয়েস্টে n=-1 (queue না করে সরাসরি fetch) যোগ করা হয়েছে। ──
 function thumbUrl(url, width) {
   if (!url) return url;
-  if (url.includes('postimg.cc')) return url;
   const clean = url.replace(/^https?:\/\//, '');
-  return `https://wsrv.nl/?url=${encodeURIComponent(clean)}&w=${width}&q=75&output=webp`;
+  return `https://wsrv.nl/?url=${encodeURIComponent(clean)}&w=${width}&q=72&output=webp&n=-1`;
 }
 
 // একটা ভিডিও একাধিক ক্যাটাগরিতে থাকতে পারবে — Sheets-এ কমা (,) দিয়ে
@@ -372,9 +370,11 @@ atOptions = {'key':'${key}','format':'iframe','height':${height},'width':${width
                 >
                   <div className="thumb-wrap">
                     <img
-                      src={thumbUrl(v.thumbnail, 400)}
+                      src={thumbUrl(v.thumbnail, 300)}
                       alt={`${v.title} - ভাইরাল ভিডিও বাংলাদেশ`}
-                      loading={i < 6 ? 'eager' : 'lazy'}
+                      loading={i < 4 ? 'eager' : 'lazy'}
+                      decoding="async"
+                      fetchpriority={i === 0 ? 'high' : 'auto'}
                       onError={e => {
                         // ── প্রক্সি ফেইল করলে আগে original থাম্বনেইল ট্রাই, তারপর picsum ফলব্যাক ──
                         if (e.target.dataset.fallback !== 'original' && v.thumbnail) {
