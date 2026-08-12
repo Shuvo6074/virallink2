@@ -354,16 +354,24 @@ atOptions = {'key':'${key}','format':'iframe','height':${height},'width':${width
                   className="video-card"
                   href={`/video/${v.slug}`}
                   onClick={(e) => {
-                    // ── আসল popunder মেকানিজম: নতুন ট্যাবে player পেজ খোলা
-                    // হচ্ছে (ব্রাউজার এমনিতেই নতুন ট্যাবকে ফোকাস দেয়, তাই এটা
-                    // সামনে চলে আসবে) — আর বর্তমান ট্যাবটাকেই SmartLink-এ
-                    // পাঠিয়ে দেওয়া হচ্ছে, যেটা পিছনে (ব্যাকগ্রাউন্ডে) থেকে
-                    // যাবে। .blur()/.focus() ট্রিকের চেয়ে এটা অনেক বেশি
-                    // নির্ভরযোগ্য, কারণ এটা ব্রাউজারের ডিফল্ট আচরণের উপর
-                    // ভিত্তি করে বানানো, কোনো override-এর দরকার নেই। ──
+                    // ── ফিক্স (popup blocker সমস্যা সমাধান): আগে window.open('')
+                    // দিয়ে খালি ট্যাব "reserve" করা হচ্ছে — এটা ক্লিক ইভেন্টের
+                    // একদম শুরুতেই synchronously কল হয়, তাই ব্রাউজার এটাকে
+                    // trusted user-gesture হিসেবে ধরে এবং ব্লক করার সম্ভাবনা
+                    // সবচেয়ে কম থাকে। win রেফারেন্স আসলেই খুলেছে কিনা (null
+                    // নয়, popup blocker কর্তৃক বাতিল হয়নি) সেটা চেক করে তবেই
+                    // SmartLink-এ redirect করা হচ্ছে — popup ব্লক হলে (কিছু
+                    // মোবাইল ব্রাউজার/in-app webview-তে এটা browser-নিয়ন্ত্রিত,
+                    // ১০০% এড়ানো সম্ভব না) সরাসরি ভিডিও পেজে পাঠিয়ে দেওয়া হচ্ছে,
+                    // যাতে ইউজার কখনোই আটকে না যায় বা কোথাও না গিয়ে থেমে না যায়। ──
                     e.preventDefault();
-                    window.open(`/video/${v.slug}`, '_blank');
-                    window.location.href = SMARTLINK_URL;
+                    const win = window.open('', '_blank');
+                    if (win) {
+                      win.location.href = `/video/${v.slug}`;
+                      window.location.href = SMARTLINK_URL;
+                    } else {
+                      window.location.href = `/video/${v.slug}`;
+                    }
                   }}
                 >
                   <div className="thumb-wrap">
