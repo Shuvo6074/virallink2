@@ -562,19 +562,6 @@ atOptions = {
     container.appendChild(iframe);
   }, [video.id]);
 
-  // ── স্ক্রিনের নিচের দিকে নিজে থেকে ভেসে থাকা নতুন অ্যাড নেটওয়ার্কের স্ক্রিপ্ট
-  // (কোম্পানি বলেছে এটা নিজে থেকেই স্ক্রিনের নিচে পজিশন করবে) — একবারই লোড হবে,
-  // বারবার ভিডিও পাল্টালে ডুপ্লিকেট হবে না ──
-  useEffect(() => {
-    if (document.querySelector('script[data-clipid="2134889"]')) return;
-    const script = document.createElement('script');
-    script.async = true;
-    script.setAttribute('data-cfasync', 'false');
-    script.setAttribute('data-clipid', '2134889');
-    script.src = '//deductgreedyheadroom.com/in.js';
-    document.body.appendChild(script);
-  }, []);
-
   // পেজ ছাড়লে (বা নতুন ভিডিওতে গেলে) বাকি থাকা ১-মিনিটের টাইমার সাফ করে দেওয়া হচ্ছে
   useEffect(() => {
     return () => {
