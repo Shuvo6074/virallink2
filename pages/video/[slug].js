@@ -307,18 +307,11 @@ export default function VideoPage({ video, related, moreVideos }) {
     return () => clearTimeout(t);
   }, [router.query.autoplay]);
 
-  // ── দ্বিতীয় overlay-তে ক্লিক করলে popunder script লোড হবে (একবারই,
-  // আগে থেকে লোড থাকলে আবার লোড হবে না), তারপর overlay সরে গিয়ে চিরতরে
-  // বন্ধ হয়ে যাবে — homepage-এর popunder ইনজেকশনের মতোই একই id-চেক
-  // পদ্ধতি ব্যবহার করা হয়েছে ডুপ্লিকেট লোড ঠেকাতে। ──
+  // ── দ্বিতীয় overlay-তে ক্লিক করলে সরাসরি নতুন ট্যাবে SmartLink খুলবে
+  // (প্রথম overlay-র মতোই সরাসরি window.open পদ্ধতি), তারপর overlay
+  // সরে গিয়ে চিরতরে বন্ধ হয়ে যাবে (আর ফিরে আসবে না) ──
   function handleAdOverlay2Click() {
-    if (!document.getElementById('popunder-script-f86a071f318811538215bbff2b3a5d83')) {
-      const script = document.createElement('script');
-      script.id = 'popunder-script-f86a071f318811538215bbff2b3a5d83';
-      script.src = 'https://pl29126528.effectivecpmnetwork.com/f8/6a/07/f86a071f318811538215bbff2b3a5d83.js';
-      script.async = true;
-      document.body.appendChild(script);
-    }
+    window.open('https://www.effectivecpmnetwork.com/z5yped96?key=51bf89de175c32426c4db7dc8e8c51d9', '_blank');
     setShowAdOverlay2(false);
   }
 
