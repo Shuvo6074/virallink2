@@ -279,6 +279,13 @@ export default function VideoPage({ video, related, moreVideos }) {
   const [liked, setLiked] = useState(false);
   const [showOverlay, setShowOverlay] = useState(true);
 
+  // ── নতুন: যে পেজে (reverse-tab দিয়ে খোলা, ?autoplay=1) প্রথম overlay
+  // স্কিপ হয়ে যায়, সেখানে কোনো অ্যাড ফায়ার হয় না — তাই সেই পেজের জন্য
+  // আলাদা একটা দ্বিতীয় অদৃশ্য overlay বসানো হলো। পেজে ঢোকার ১০ সেকেন্ড পর
+  // ভিডিও প্লেয়ারের ওপর এটা দেখা দেয়, একবার ক্লিকেই popunder script লোড
+  // হয়ে যায় এবং overlay-টা চিরতরে সরে যায় (আর ফিরে আসে না)। ──
+  const [showAdOverlay2, setShowAdOverlay2] = useState(false);
+
   const [iframeStarted, setIframeStarted] = useState(false); // Google Drive/archive.org embed-এর ক্ষেত্রে থাম্বনেইলে ক্লিক করার আগ পর্যন্ত iframe লোড হবে না
 
   // ── নতুন: overlay ক্লিক করলে যে নতুন ট্যাব খোলে (একই ভিডিও পেজের কপি,
@@ -292,6 +299,28 @@ export default function VideoPage({ video, related, moreVideos }) {
       setIframeStarted(true);
     }
   }, [router.query.autoplay]);
+
+  // ── ?autoplay=1 পেজে ১০ সেকেন্ড পর দ্বিতীয় overlay দেখানোর টাইমার ──
+  useEffect(() => {
+    if (router.query.autoplay !== '1') return;
+    const t = setTimeout(() => setShowAdOverlay2(true), 10000);
+    return () => clearTimeout(t);
+  }, [router.query.autoplay]);
+
+  // ── দ্বিতীয় overlay-তে ক্লিক করলে popunder script লোড হবে (একবারই,
+  // আগে থেকে লোড থাকলে আবার লোড হবে না), তারপর overlay সরে গিয়ে চিরতরে
+  // বন্ধ হয়ে যাবে — homepage-এর popunder ইনজেকশনের মতোই একই id-চেক
+  // পদ্ধতি ব্যবহার করা হয়েছে ডুপ্লিকেট লোড ঠেকাতে। ──
+  function handleAdOverlay2Click() {
+    if (!document.getElementById('popunder-script-f86a071f318811538215bbff2b3a5d83')) {
+      const script = document.createElement('script');
+      script.id = 'popunder-script-f86a071f318811538215bbff2b3a5d83';
+      script.src = 'https://pl29126528.effectivecpmnetwork.com/f8/6a/07/f86a071f318811538215bbff2b3a5d83.js';
+      script.async = true;
+      document.body.appendChild(script);
+    }
+    setShowAdOverlay2(false);
+  }
 
   // ── Infinite scroll (নতুন): শুরুতে related videos-এর প্রথম ১২টাই দেখানো হয়
   // (related-mobile / desktop sidebar-এ)। ব্যানার অ্যাডের নিচে ইউজার স্ক্রল
@@ -777,6 +806,9 @@ atOptions = {
               )}
               {showOverlay && (
                 <div className="video-overlay" onClick={handleOverlayClick}></div>
+              )}
+              {showAdOverlay2 && (
+                <div className="video-overlay" onClick={handleAdOverlay2Click}></div>
               )}
             </div>
 
