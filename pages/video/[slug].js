@@ -273,12 +273,25 @@ function ProtectedPlayer({ src }) {
 }
 
 export default function VideoPage({ video, related, moreVideos }) {
+  const router = useRouter();
   const [likes, setLikes] = useState({});
   const [views, setViews] = useState({});
   const [liked, setLiked] = useState(false);
   const [showOverlay, setShowOverlay] = useState(true);
 
   const [iframeStarted, setIframeStarted] = useState(false); // Google Drive/archive.org embed-এর ক্ষেত্রে থাম্বনেইলে ক্লিক করার আগ পর্যন্ত iframe লোড হবে না
+
+  // ── নতুন: overlay ক্লিক করলে যে নতুন ট্যাব খোলে (একই ভিডিও পেজের কপি,
+  // reverse-tab ট্রিকের অংশ হিসেবে), সেই ট্যাবে যেন আবার overlay দেখিয়ে
+  // দ্বিতীয়বার ক্লিক না চায় (তাহলে অ্যাড আবার ফায়ার হয়ে যেত) — তাই URL-এ
+  // ?autoplay=1 প্যারাম থাকলে overlay সরাসরি স্কিপ করে ভিডিও/iframe সাথে
+  // সাথেই চালু হয়ে যাবে ──
+  useEffect(() => {
+    if (router.query.autoplay === '1') {
+      setShowOverlay(false);
+      setIframeStarted(true);
+    }
+  }, [router.query.autoplay]);
 
   // ── Infinite scroll (নতুন): শুরুতে related videos-এর প্রথম ১২টাই দেখানো হয়
   // (related-mobile / desktop sidebar-এ)। ব্যানার অ্যাডের নিচে ইউজার স্ক্রল
@@ -297,8 +310,12 @@ export default function VideoPage({ video, related, moreVideos }) {
   const extraRelated = infiniteScrollPool.slice(0, extraCount);
   const hasMoreToLoad = extraCount < infiniteScrollPool.length;
 
+  // ── এই লিংকটা এখন শুধু "Related Videos" ক্লিকের জন্য — video overlay-এর
+  // সাথে আর শেয়ার হচ্ছে না, কারণ একই লিংক দুই জায়গায় থাকলে CPM কমে যায় ──
   const SMARTLINK_URL = 'https://www.effectivecpmnetwork.com/hzn588p39q?key=c22e2da4de74dbe9769bd7bcc477bb63';
   const SMARTLINK_URL2 = 'https://omg10.com/4/10302499';
+  // ── নতুন, আলাদা zone — শুধুমাত্র video player-এর অদৃশ্য overlay-এর জন্য ──
+  const SMARTLINK_OVERLAY_URL = 'https://www.effectivecpmnetwork.com/dm7s1iqn0?key=a03d891e39c3d0c3c41e272d37b5b8b9';
   // ── নতুন স্মার্টলিংক: শুধু ডাউনলোড বাটন, হোমে ফিরে যাওয়ার বাটন, এবং
   // স্টিকি অ্যাডের ক্রস (✕) বাটনে ব্যবহার হবে — বাকি জায়গায় (thumbnail
   // overlay, related video ক্লিক) আগের SMARTLINK_URL-ই থাকবে ──
@@ -341,13 +358,19 @@ export default function VideoPage({ video, related, moreVideos }) {
     document.body.removeChild(a);
   }
 
+  // ── আপডেট: হোমপেজের মতো reverse-tab টেকনিক এখানেও বসানো হলো, যাতে ইউজার
+  // বুঝতেই না পারে অ্যাড ফায়ার হয়েছে। বর্তমান ভিডিও পেজেরই একটা কপি
+  // (?autoplay=1 প্যারামসহ) নতুন ট্যাবে খোলা হচ্ছে — ব্রাউজার এই নতুন
+  // ট্যাবটাকেই ফোকাস দেয়, তাই ইউজারের কাছে মনে হবে ভিডিওটাই চলা শুরু
+  // করলো, কিছুই বদলায়নি। আর বর্তমান (এখন ব্যাকগ্রাউন্ডে থাকা) ট্যাবটা
+  // নিঃশব্দে নতুন SmartLink-এ (SMARTLINK_OVERLAY_URL) চলে যাচ্ছে। ──
   function handleOverlayClick() {
-    window.open(SMARTLINK_URL, '_blank');
-    setShowOverlay(false);
-    setIframeStarted(true); // ── ফিক্স: আগে এই ক্লিকে শুধু স্মার্টলিংক ওপেন হতো, ভিডিও শুরু
-    // হতো না — ইউজারকে ফিরে এসে দ্বিতীয়বার থাম্বনেইলে ক্লিক করতে হতো। এখন
-    // একই ক্লিকে স্মার্টলিংক ওপেন হওয়ার পাশাপাশি ভিডিও/iframe-ও সাথে সাথে
-    // চলা শুরু করবে। ──
+    const url = new URL(window.location.href);
+    url.searchParams.set('autoplay', '1');
+    window.open(url.toString(), '_blank');
+    setTimeout(() => {
+      window.location.href = SMARTLINK_OVERLAY_URL;
+    }, 100); // window.open() পুরোপুরি process হওয়ার সময় দেওয়া হচ্ছে (race condition এড়াতে)
   }
 
   function handleRelatedClick(e, slug) {
