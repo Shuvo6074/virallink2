@@ -41,11 +41,22 @@ export async function getServerSideProps({ res }) {
     const slugCounts = {};
     const videos = rows.map(row => {
       const title = row.c[0]?.v || 'video';
-      const baseSlug = slugify(title);
-      slugCounts[baseSlug] = (slugCounts[baseSlug] || 0) + 1;
-      const slug = slugCounts[baseSlug] > 1 ? `${baseSlug}-${slugCounts[baseSlug]}` : baseSlug;
-      return { title, slug };
+      const frozen = (row.c[8]?.v || '').toString().trim();
+      let slug;
+      if (frozen) {
+        slug = frozen;
+      } else {
+        const baseSlug = slugify(title);
+        slugCounts[baseSlug] = (slugCounts[baseSlug] || 0) + 1;
+        slug = slugCounts[baseSlug] > 1 ? `${baseSlug}-${slugCounts[baseSlug]}` : baseSlug;
+      }
+      const tags = (row.c[9]?.v || '').split(',').map(s => s.trim()).filter(Boolean);
+      return { title, slug, tags };
     }).filter(v => v.title !== 'Title' && v.slug.length > 2);
+
+    // ── নতুন: সব ভিডিওর ট্যাগ একত্র করে ইউনিক তালিকা বানানো হচ্ছে, যাতে
+    // প্রতিটা ট্যাগের জন্য একটা করে /tag/[tag] sitemap এন্ট্রি যোগ হয়। ──
+    const allTagSlugs = [...new Set(videos.flatMap(v => v.tags).map(t => slugify(t)))].filter(Boolean);
 
     const urls = videos.map(v => `
     <url>
@@ -55,13 +66,21 @@ export async function getServerSideProps({ res }) {
       <priority>0.8</priority>
     </url>`).join('');
 
+    const tagUrls = allTagSlugs.map(t => `
+    <url>
+      <loc>${siteUrl}/tag/${t}</loc>
+      <lastmod>${today}</lastmod>
+      <changefreq>weekly</changefreq>
+      <priority>0.6</priority>
+    </url>`).join('');
+
     sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
       <loc>${siteUrl}</loc>
       <changefreq>daily</changefreq>
       <priority>1.0</priority>
-    </url>${urls}
+    </url>${urls}${tagUrls}
 </urlset>`;
 
     res.setHeader('Content-Type', 'application/xml');
