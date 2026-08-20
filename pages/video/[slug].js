@@ -104,12 +104,27 @@ function parseCategories(str) {
   return arr.length ? arr : ['General'];
 }
 
+// ── নতুন: SEO ট্যাগ সিস্টেম। Sheet-এর কলাম J (index 9)-এ কমা দিয়ে
+// আলাদা করা ট্যাগ লেখা যাবে, যেমন: "bangladesh new xxx, viral link video".
+// এগুলো ভিডিও পেজের নিচে ক্লিকযোগ্য বাটন হিসেবে দেখাবে এবং প্রতিটা
+// /tag/[tag-slug] নামে একটা আলাদা archive পেজে নিয়ে যাবে। এই ফিচার
+// সম্পূর্ণ স্বাধীন — slug/URL generation-এর কোনো লজিক স্পর্শ করে না। ──
+function parseTags(str) {
+  return (str || '').split(',').map(s => s.trim()).filter(Boolean);
+}
+
 // একই টাইটেল বারবার এলে slug-এর শেষে -2, -3 ... যোগ হবে, যাতে প্রতিটা
 // ভিডিওর নিজস্ব আলাদা URL থাকে। index.js আর sitemap.js-এও এই একই
 // লজিক ব্যবহার করা হয়েছে, তাই সব জায়গায় slug মিলে যাবে।
+//
+// ── SLUG ফ্রিজ ফিক্স: Sheet-এর কলাম I (index 8)-তে slug বসানো থাকলে
+// সেটাই ব্যবহার হবে (Title বদলালেও URL অক্ষত থাকে)। কলাম I খালি থাকলে
+// আগের মতোই Title থেকে auto-generate হবে। ──
 function getUniqueSlugs(rows, slugifyFn) {
   const counts = {};
   return rows.map(row => {
+    const frozen = (row.c[8]?.v || '').toString().trim();
+    if (frozen) return frozen;
     const base = slugifyFn(row.c[0]?.v || 'video');
     counts[base] = (counts[base] || 0) + 1;
     return counts[base] > 1 ? `${base}-${counts[base]}` : base;
@@ -168,6 +183,7 @@ export async function getServerSideProps({ params, res: httpRes }) {
       duration:    row.c[5]?.v || '',
       description: row.c[6]?.v || '',
       hlsPath:     getHlsProxyPath(row.c[7]?.v || ''), // ── নতুন কলাম H: hls_url ──
+      tags:        parseTags(row.c[9]?.v || ''), // ── নতুন কলাম J: Tags ──
       slug:        uniqueSlugs[i]
     })).filter(v => v.title !== 'Title').reverse()
       .map((v, idx) => ({ ...v, pageBatch: Math.floor(idx / PER_PAGE) + 1 }));
@@ -715,6 +731,9 @@ atOptions = {
           .action-btn.share-btn:hover{border-color:#16a34a;color:#16a34a;}
           .action-btn.download-btn:hover{border-color:#dc2626;color:#dc2626;}
           .video-description{color:#ccc;font-size:0.9rem;line-height:1.7;margin-bottom:1rem;padding:0.75rem 1rem;background:var(--surface2);border-radius:var(--radius);border-left:3px solid var(--accent);}
+          .video-tags{display:flex;flex-wrap:wrap;gap:0.5rem;margin-bottom:1rem;}
+          .tag-pill{display:inline-block;padding:0.3rem 0.75rem;background:var(--surface2);color:var(--muted);font-size:0.8rem;border-radius:999px;text-decoration:none;border:1px solid rgba(255,255,255,0.1);transition:background 0.15s,color 0.15s;}
+          .tag-pill:hover{background:var(--accent);color:#fff;}
           .related-section-title{font-family:'Bebas Neue',sans-serif;font-size:1.2rem;margin-bottom:1rem;letter-spacing:1px;}
           .related-list{display:grid;grid-template-columns:repeat(2,1fr);gap:2px;}
           @media(min-width:600px){.related-list{grid-template-columns:repeat(3,1fr);}}
@@ -824,6 +843,14 @@ atOptions = {
 
             {video.description && (
               <p className="video-description">{video.description}</p>
+            )}
+
+            {video.tags && video.tags.length > 0 && (
+              <div className="video-tags">
+                {video.tags.map((tag, ti) => (
+                  <a key={ti} href={`/tag/${slugify(tag)}`} className="tag-pill">#{tag}</a>
+                ))}
+              </div>
             )}
 
             {/* 300x250 Banner Ad - below player, above related */}
