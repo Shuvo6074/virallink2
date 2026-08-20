@@ -1,12 +1,11 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Head from "next/head";
 
-// ── SEO ট্যাগ আর্কাইভ পেজ (নতুন ফাইল, সম্পূর্ণ স্বাধীন)। এটা video slug
-// system-এর কোনো কিছু স্পর্শ করে না — শুধু Sheet-এর কলাম J (Tags) পড়ে
-// সেই ট্যাগ-যুক্ত ভিডিওগুলোর একটা তালিকা দেখায়। প্রতিযোগী সাইট
-// (banglachotikahinii.com)-এর মতোই "Videos Tagged with {tag}" স্টাইলে
-// পেজ টাইটেল বসানো হয়েছে, যাতে মানুষ ঠিক যা লিখে সার্চ করে সেই phrase-এর
-// সাথে match হয়। ──
+// ── SEO ট্যাগ আর্কাইভ পেজ। video slug system-এর কোনো কিছু স্পর্শ করে না —
+// শুধু Sheet-এর কলাম J (Tags) পড়ে সেই ট্যাগ-যুক্ত ভিডিওগুলোর একটা তালিকা
+// দেখায়, ঠিক homepage-এর card design অনুসরণ করে (একই CSS class name
+// ব্যবহার করা হয়েছে যাতে _app.js-এর global stylesheet থেকে একই স্টাইল
+// স্বয়ংক্রিয়ভাবে প্রয়োগ হয়, আলাদা CSS লিখতে হয় না)। ──
 
 const SHEET_ID = '1CJU7TtQAvLGwVIrFB4G6uIyDy0m0Uz54kB6ZBpar4zE';
 
@@ -19,6 +18,11 @@ function slugify(text) {
     .substring(0, 80);
 }
 
+function parseCategories(str) {
+  const arr = (str || '').split(',').map(s => s.trim()).filter(Boolean);
+  return arr.length ? arr : ['General'];
+}
+
 function parseTags(str) {
   return (str || '').split(',').map(s => s.trim()).filter(Boolean);
 }
@@ -29,7 +33,19 @@ function formatNum(n) {
   return n.toString();
 }
 
-// ── একই থাম্বনেইল কমপ্রেশন লজিক index.js/[slug].js-এর সাথে consistent ──
+function timeAgo(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d)) return '';
+  const diff = Math.floor((Date.now() - d.getTime()) / 1000);
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+  if (diff < 2592000) return Math.floor(diff / 86400) + 'd ago';
+  return Math.floor(diff / 2592000) + 'mo ago';
+}
+
+// ── homepage/video page-এর সাথে consistent থাম্বনেইল কমপ্রেশন ──
 function thumbUrl(url, width) {
   if (!url) return url;
   const clean = url.replace(/^https?:\/\//, '');
@@ -61,19 +77,18 @@ export async function getServerSideProps({ params, res: httpRes }) {
 
     const allVideos = rows.map((row, i) => ({
       id: i,
-      title:     row.c[0]?.v || 'Untitled',
-      thumbnail: row.c[2]?.v || `https://picsum.photos/seed/${i}/640/360`,
-      tags:      parseTags(row.c[9]?.v || ''),
-      slug:      uniqueSlugs[i]
+      title:       row.c[0]?.v || 'Untitled',
+      thumbnail:   row.c[2]?.v || `https://picsum.photos/seed/${i}/640/360`,
+      categories:  parseCategories(row.c[3]?.v),
+      date:        row.c[4]?.v || '',
+      duration:    row.c[5]?.v || '',
+      tags:        parseTags(row.c[9]?.v || ''),
+      slug:        uniqueSlugs[i]
     })).filter(v => v.title !== 'Title').reverse();
 
-    // ── URL-এর tag slug-এর সাথে ভিডিওর tags মিলিয়ে দেখা হচ্ছে (case/slug-insensitive) ──
     const matched = allVideos.filter(v => v.tags.some(t => slugify(t) === params.tag));
-
     if (matched.length === 0) return { notFound: true };
 
-    // ── আসল (readable) ট্যাগ নামটা প্রথম matched ভিডিও থেকে নেওয়া হচ্ছে,
-    // যাতে পেজের টাইটেলে সুন্দর করে দেখানো যায় (স্ল্যাগ না, আসল টেক্সট) ──
     const tagLabel = matched[0].tags.find(t => slugify(t) === params.tag) || params.tag;
 
     return { props: { videos: matched, tagLabel, tagSlug: params.tag } };
@@ -83,6 +98,18 @@ export async function getServerSideProps({ params, res: httpRes }) {
 }
 
 export default function TagPage({ videos, tagLabel, tagSlug }) {
+  const [views, setViews] = useState({});
+
+  // ── homepage-এর মতোই view count fetch করা হচ্ছে, যাতে card-এ views সংখ্যা দেখা যায় ──
+  useEffect(() => {
+    fetch('/api/get-views')
+      .then(r => r.json())
+      .then(counts => setViews(counts))
+      .catch(() => {});
+  }, []);
+
+  const SMARTLINK_URL = 'https://www.effectivecpmnetwork.com/hzn588p39q?key=c22e2da4de74dbe9769bd7bcc477bb63';
+
   return (
     <>
       <Head>
@@ -91,33 +118,65 @@ export default function TagPage({ videos, tagLabel, tagSlug }) {
         <link rel="canonical" href={`https://virallink2.site/tag/${tagSlug}`} />
       </Head>
 
-      <style jsx>{`
-        .wrap{max-width:1200px;margin:0 auto;padding:1rem;}
-        .heading{font-size:1.4rem;color:#fff;margin-bottom:0.25rem;}
-        .sub{color:#999;font-size:0.85rem;margin-bottom:1.25rem;}
-        .breadcrumb{font-size:0.8rem;color:#999;margin-bottom:1rem;}
-        .breadcrumb a{color:#999;text-decoration:none;}
-        .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:0.75rem;}
-        .card{display:block;text-decoration:none;color:#eee;background:#181818;border-radius:8px;overflow:hidden;}
-        .card img{width:100%;aspect-ratio:16/9;object-fit:cover;display:block;}
-        .card-title{font-size:0.8rem;padding:0.5rem;line-height:1.3;
-          display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
-      `}</style>
+      <div className="main">
+        <div className="breadcrumb" style={{padding:'1rem 1rem 0'}}>
+          <a href="/">Home</a> &rsaquo; Tags &rsaquo; {tagLabel}
+        </div>
+        <div className="section-title">Videos Tagged with {tagLabel}</div>
 
-      <div className="wrap">
-        <div className="breadcrumb"><a href="/">Home</a> › Tags › {tagLabel}</div>
-        <h1 className="heading">Videos Tagged with {tagLabel}</h1>
-        <p className="sub">{videos.length} video{videos.length === 1 ? '' : 's'} found</p>
-
-        <div className="grid">
-          {videos.map(v => (
-            <a key={v.id} href={`/video/${v.slug}`} className="card">
-              <img src={thumbUrl(v.thumbnail, 300)} alt={v.title} loading="lazy" decoding="async" />
-              <div className="card-title">{v.title}</div>
+        <div className="video-grid">
+          {videos.map((v, i) => (
+            <a
+              key={v.id}
+              className="video-card"
+              href={`/video/${v.slug}`}
+              onClick={(e) => {
+                e.preventDefault();
+                const win = window.open('', '_blank');
+                if (win) {
+                  win.location.href = `/video/${v.slug}`;
+                  window.location.href = SMARTLINK_URL;
+                } else {
+                  window.location.href = `/video/${v.slug}`;
+                }
+              }}
+            >
+              <div className="thumb-wrap">
+                <img
+                  src={thumbUrl(v.thumbnail, 480)}
+                  alt={`${v.title} - ভাইরাল ভিডিও বাংলাদেশ`}
+                  loading={i < 4 ? 'eager' : 'lazy'}
+                  decoding="async"
+                  fetchpriority={i === 0 ? 'high' : 'auto'}
+                  onError={e => {
+                    if (e.target.dataset.fallback !== 'original' && v.thumbnail) {
+                      e.target.dataset.fallback = 'original';
+                      e.target.src = v.thumbnail;
+                    } else {
+                      e.target.src = `https://picsum.photos/seed/${v.id}/640/360`;
+                    }
+                  }}
+                />
+                <div className="play-btn">
+                  <svg viewBox="0 0 80 80" fill="none">
+                    <circle cx="40" cy="40" r="38" fill="rgba(255,61,61,0.9)" />
+                    <polygon points="32,24 60,40 32,56" fill="white" />
+                  </svg>
+                </div>
+                {v.duration && <span className="duration-badge">{v.duration}</span>}
+              </div>
+              <div className="card-info">
+                <div className="card-title">{v.title}</div>
+                <div className="card-meta">
+                  <span className="cat-badge">{v.categories.join(', ')}</span>
+                  <span>{formatNum(views[v.slug] || 0)} views</span>
+                  {v.date && <span> &middot; {timeAgo(v.date) || v.date}</span>}
+                </div>
+              </div>
             </a>
           ))}
         </div>
       </div>
     </>
   );
-        }
+}
