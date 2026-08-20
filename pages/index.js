@@ -105,9 +105,15 @@ function slugifySSR(text) {
 // একই টাইটেল বারবার এলে slug-এর শেষে -2, -3 ... যোগ হবে, যাতে প্রতিটা
 // ভিডিওর নিজস্ব আলাদা URL থাকে। sitemap.js আর [slug].js-এও এই একই
 // লজিক ব্যবহার করা হয়েছে, তাই সব জায়গায় slug মিলে যাবে।
+//
+// ── SLUG ফ্রিজ ফিক্স: Sheet-এর কলাম I (index 8)-তে slug বসানো থাকলে
+// সেটাই ব্যবহার হবে (Title বদলালেও URL অক্ষত থাকে)। কলাম I খালি থাকলে
+// আগের মতোই Title থেকে auto-generate হবে। ──
 function getUniqueSlugs(rows, slugifyFn) {
   const counts = {};
   return rows.map(row => {
+    const frozen = (row.c[8]?.v || '').toString().trim();
+    if (frozen) return frozen;
     const base = slugifyFn(row.c[0]?.v || 'video');
     counts[base] = (counts[base] || 0) + 1;
     return counts[base] > 1 ? `${base}-${counts[base]}` : base;
