@@ -66,7 +66,9 @@ function getUniqueSlugs(rows) {
 }
 
 export async function getServerSideProps({ params, res: httpRes }) {
-  httpRes.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
+  // ── রিকোয়েস্ট কমানোর ফিক্স: 300s থেকে 900s করা হলো, homepage/video
+  // page-এর সাথে consistent রাখতে। ──
+  httpRes.setHeader('Cache-Control', 'public, s-maxage=900, stale-while-revalidate=1800');
 
   try {
     const res = await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json`);
