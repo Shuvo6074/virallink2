@@ -164,7 +164,10 @@ function getHlsProxyPath(raw) {
 export async function getServerSideProps({ params, res: httpRes }) {
   // ── পারফরম্যান্স ফিক্স: index.js-এর মতোই এই পেজও Edge-এ ৬০ সেকেন্ড
   // cache হবে, দ্বিতীয়বার একই ভিডিও পেজে কেউ গেলে সাথে সাথে লোড হবে। ──
-  httpRes.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
+  // ── রিকোয়েস্ট কমানোর ফিক্স: index.js-এর সাথে consistent, 60s থেকে
+  // 900s (15 মিনিট) করা হলো — একই ভিডিও পেজ বারবার visitor দেখলে Worker
+  // প্রতিবার Sheet fetch করবে না, Cloudflare edge cache থেকেই সার্ভ হবে। ──
+  httpRes.setHeader('Cache-Control', 'public, s-maxage=900, stale-while-revalidate=1800');
 
   try {
     const res = await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json`);
