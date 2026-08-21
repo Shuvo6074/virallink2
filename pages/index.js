@@ -126,7 +126,12 @@ export async function getServerSideProps({ res: httpRes }) {
   // প্রতিবার নতুন করে Google Sheets fetch করতে হবে না। ডেটা বদলালে
   // (নতুন ভিডিও যোগ হলে) সর্বোচ্চ ৬০ সেকেন্ড দেরিতে দেখাবে, এটা নিয়ে
   // চিন্তার কিছু নেই — বাকি সব লজিক আগের মতোই অপরিবর্তিত। ──
-  httpRes.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
+  // ── রিকোয়েস্ট কমানোর ফিক্স: 60s থেকে বাড়িয়ে 900s (15 মিনিট) করা হলো।
+  // stale-while-revalidate মানে এই সময়ের মধ্যেও কেউ নতুন ভিডিও পাবলিশ
+  // করলে পুরনো (stale) কপি সাথে সাথেই serve হবে, ব্যাকগ্রাউন্ডে নতুন
+  // ভার্সন fetch হয়ে যাবে — ইউজার কখনো লোডিং wait করবে না, শুধু নতুন
+  // ভিডিও দেখা যেতে সর্বোচ্চ ১৫ মিনিট দেরি হতে পারে। ──
+  httpRes.setHeader('Cache-Control', 'public, s-maxage=900, stale-while-revalidate=1800');
 
   try {
     const res = await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID_SSR}/gviz/tq?tqx=out:json`);
