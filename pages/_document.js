@@ -13,6 +13,7 @@ export default function Document() {
         <meta name="juicyads-site-verification" content="6c7e2eeb94e355ac0b4b104e07d42fbb" />
         <meta name="clckd" content="9312f9b9453e2b38d5937a3b6301c145" />
         <meta name="6a97888e-site-verification" content="c467fb8cea7003a194330a267add6ff7" />
+        <meta name="eroads_" content="473f327f654433a95a24752e9a824390" />
         <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
         <meta name="googlebot" content="index, follow" />
         <meta name="rating" content="adult" />
