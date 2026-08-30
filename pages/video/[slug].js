@@ -362,29 +362,6 @@ export default function VideoPage({ video, related, moreVideos }) {
   // overlay, related video ক্লিক) আগের SMARTLINK_URL-ই থাকবে ──
   const SMARTLINK_URL3 = 'https://www.effectivecpmnetwork.com/d8p5gydx1q?key=5f5c0ae5e81527597f51a1640abb1be8';
 
-  // ── স্টিকি বটম ব্যানার অ্যাড (নতুন, 320x50): প্রতিটা ভিডিও প্লেয়ার পেজে
-  // স্ক্রিনের নিচ থেকে সামান্য উপরে ভেসে থাকবে। ক্রস (✕) বাটনে প্রথমবার
-  // ক্লিকে স্মার্টলিংক ওপেন হবে (অ্যাড তখনও থাকবে), দ্বিতীয়বার ক্লিকে
-  // অ্যাডটা বন্ধ হয়ে যাবে। বন্ধ হওয়ার ১ মিনিট পর এটা আবার notification-এর
-  // মতো ফিরে আসবে — যতক্ষণ ইউজার এই পেজে থাকবে। ──
-  const [stickyAdVisible, setStickyAdVisible] = useState(true);
-  const stickyAdClickRef = useRef(0); // 0 = এখনো ক্লিক হয়নি, 1 = একবার ক্লিক হয়েছে (পরের ক্লিকে বন্ধ হবে)
-  const stickyAdTimerRef = useRef(null);
-
-  function handleStickyAdClose() {
-    if (stickyAdClickRef.current === 0) {
-      window.open(SMARTLINK_URL3, '_blank');
-      stickyAdClickRef.current = 1;
-    } else {
-      setStickyAdVisible(false);
-      stickyAdClickRef.current = 0;
-      if (stickyAdTimerRef.current) clearTimeout(stickyAdTimerRef.current);
-      stickyAdTimerRef.current = setTimeout(() => {
-        setStickyAdVisible(true);
-      }, 60000); // ১ মিনিট পর আবার দেখাবে
-    }
-  }
-
   // ── ডাউনলোড: বিজ্ঞাপন (SMARTLINK_URL) খোলার সাথে সাথে, নিজস্ব R2
   // সার্ভারে (H কলাম) থাকা mp4/webm ভিডিও হলে আসল ফাইল ডাউনলোডও শুরু
   // হয়ে যাবে — ইউজারকে আলাদা করে ভিডিওর উপর চেপে ধরে ডাউনলোড করতে
@@ -594,46 +571,42 @@ atOptions = {
     container.appendChild(iframe);
   }, [hasMoreToLoad, video.id]);
 
-  // ── স্টিকি বটম ব্যানার অ্যাড (highperformanceformat, 320x50) ইনজেক্ট করা।
-  // container সবসময় DOM-এ থাকে (শুধু CSS দিয়ে দেখানো/লুকানো হয়), তাই অ্যাডটা
-  // একবারই লোড হয় — বন্ধ করে আবার দেখালে নতুন করে reload হয় না। ──
+  // ── নতুন: EroAdvertising ইন-পেজ ভিডিও অ্যাড (eaCtrl, plugin: inpage_video)।
+  // eaCtrl.add() কল করলে স্ক্রিপ্টটা নিজে থেকেই sp_8222501_node div-এ ভিডিও
+  // বসিয়ে অটোপ্লে করে; ইউজার স্ক্রল করে div-টা viewport থেকে বের হয়ে গেলে
+  // eaCtrl নিজে থেকেই ভিডিওটাকে ছোট করে ফ্লোট করিয়ে দেয় (বিল্ট-ইন ফিচার,
+  // আলাদা কোড লাগে না)। আমরা CSS দিয়ে div-টাকে সবসময় স্ক্রিনের নিচে ফিক্সড
+  // রেখেছি (নিচের JSX + .inpage-video-ad-wrap স্টাইল দেখো), তাই এটা সবসময়ই
+  // ফোনের নিচের দিকে ভাসমান ভিডিও আকারে থাকবে। ──
   useEffect(() => {
-    const container = document.getElementById('sticky-bottom-ad');
+    const container = document.getElementById('sp_8222501_node');
     if (!container || container.dataset.loaded) return;
     container.dataset.loaded = 'true';
 
-    const iframe = document.createElement('iframe');
-    iframe.style.width = '320px';
-    iframe.style.height = '50px';
-    iframe.style.border = '0';
-    iframe.style.overflow = 'hidden';
-    iframe.scrolling = 'no';
+    if (typeof window.eaCtrl === 'undefined') {
+      window.eaCtrlRecs = [];
+      window.eaCtrl = { add: function (ag) { window.eaCtrlRecs.push(ag); } };
+      const js = document.createElement('script');
+      js.setAttribute('src', '//go.easrv.cl/loadeactrl.go?pid=155365&spaceid=8222501&ctrlid=799972');
+      document.head.appendChild(js);
+    }
 
-    const html = `<!DOCTYPE html><html><head><style>html,body{margin:0;padding:0;overflow:hidden;}</style></head><body>
-<script type="text/javascript">
-atOptions = {
-  'key' : 'a53560d1fd4456c1b116bb4b19b4d32a',
-  'format' : 'iframe',
-  'height' : 50,
-  'width' : 320,
-  'params' : {}
-};
-</script>
-<script type="text/javascript" src="https://www.highperformanceformat.com/a53560d1fd4456c1b116bb4b19b4d32a/invoke.js"></script>
-</body></html>`;
-
-    iframe.srcdoc = html;
-    container.appendChild(iframe);
+    window.eaCtrl.add({
+      plugin: 'inpage_video',
+      sid: 8222501,
+      display: 'sp_8222501_node',
+      skip_btn: true,
+      skip_after_sec: 5,
+      show_countdown: true,
+      skip_position: 'top-right',
+      auto_hide: true,
+      controls: false,
+      muted: true,
+      autoplay: true,
+      loop: true,
+      advertise: 'Advertisement'
+    });
   }, [video.id]);
-
-  // পেজ ছাড়লে (বা নতুন ভিডিওতে গেলে) বাকি থাকা ১-মিনিটের টাইমার সাফ করে দেওয়া হচ্ছে
-  useEffect(() => {
-    return () => {
-      if (stickyAdTimerRef.current) clearTimeout(stickyAdTimerRef.current);
-    };
-  }, [video.id]);
-
-
 
 
   function toggleLike() {
@@ -759,9 +732,7 @@ atOptions = {
           .iframe-click-gate img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0.75;}
           .iframe-click-gate .play-btn-icon{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:64px;height:64px;border-radius:50%;background:rgba(255,61,61,0.9);display:flex;align-items:center;justify-content:center;color:#fff;font-size:24px;box-shadow:0 4px 16px rgba(0,0,0,0.5);}
           .video-overlay{position:absolute;inset:0;width:100%;height:100%;background:transparent;cursor:pointer;z-index:10;}
-          .sticky-bottom-ad-wrap{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:300;background:#111;border:1px solid var(--border);border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,0.5);padding:2px;line-height:0;}
-          .sticky-bottom-ad-wrap.hidden{display:none;}
-          .sticky-bottom-ad-close{position:absolute;top:-9px;right:-9px;width:22px;height:22px;border-radius:50%;background:#3a3a3a;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;cursor:pointer;border:2px solid var(--bg);line-height:1;}
+          .inpage-video-ad-wrap{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:299;max-width:426px;width:92vw;}
         `}</style>
       </Head>
 
@@ -775,9 +746,9 @@ atOptions = {
           ক্রস বাটনে প্রথম ক্লিকে স্মার্টলিংক ওপেন হয়, দ্বিতীয় ক্লিকে অ্যাড বন্ধ হয়ে
           যায় (১ মিনিট পর আবার ফিরে আসে)। container সবসময় DOM-এ থাকে,
           শুধু visibility CSS দিয়ে টগল হয়, তাই অ্যাড বারবার reload হয় না। */}
-      <div className={`sticky-bottom-ad-wrap${stickyAdVisible ? '' : ' hidden'}`}>
-        <div id="sticky-bottom-ad" style={{ width: '320px', height: '50px', maxWidth: '90vw' }}></div>
-        <div className="sticky-bottom-ad-close" onClick={handleStickyAdClose}>✕</div>
+      {/* EroAdvertising ইন-পেজ ভিডিও অ্যাড — ফোনের স্ক্রিনের নিচের দিকে ভাসমান ভিডিও আকারে দেখাবে */}
+      <div className="inpage-video-ad-wrap">
+        <div id="sp_8222501_node" style={{ maxWidth: '426px', maxHeight: '240px', display: 'none' }}>&nbsp;</div>
       </div>
 
       <div className="main">
