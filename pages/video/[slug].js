@@ -503,38 +503,21 @@ atOptions = {
     });
   }, [video.id]);
 
-  // ── ব্যানার অ্যাড (highperformanceformat, 728x90) — related videos-এর নিচে।
-  // আগে এখানে effectivecpmnetwork-এর নেটিভ অ্যাড ছিল, সেটা বদলে এই
-  // নতুন 728x90 ব্যানার বসানো হলো (isolated iframe দিয়ে, যাতে অন্য
-  // কোনো অ্যাডের সাথে কনফ্লিক্ট না হয়) ──
+  // ── ব্যানার অ্যাড (profitableratecpmnetwork) — related videos-এর নিচে,
+  // "More Videos" সেকশনের ঠিক আগে। আগে এখানে highperformanceformat-এর
+  // 728x90 iframe ব্যানার ছিল, নতুন নেটওয়ার্কের স্ক্রিপ্ট-বেসড অ্যাড দিয়ে
+  // বদলানো হলো — স্ক্রিপ্টটা নিজে থেকেই নিচের container div-টা খুঁজে
+  // সেখানে অ্যাড রেন্ডার করে। ──
   useEffect(() => {
-    const container = document.getElementById('native-banner-related');
+    const container = document.getElementById('container-e474628fdcec06f52100e0b84b3fa759');
     if (!container || container.dataset.loaded) return;
     container.dataset.loaded = 'true';
 
-    const iframe = document.createElement('iframe');
-    iframe.style.width = '728px';
-    iframe.style.height = '90px';
-    iframe.style.maxWidth = '100%';
-    iframe.style.border = '0';
-    iframe.style.overflow = 'hidden';
-    iframe.scrolling = 'no';
-
-    const html = `<!DOCTYPE html><html><head><style>html,body{margin:0;padding:0;overflow:hidden;}</style></head><body>
-<script type="text/javascript">
-atOptions = {
-  'key' : '2c6dbe338bfe942aba8e44ed0a288e48',
-  'format' : 'iframe',
-  'height' : 90,
-  'width' : 728,
-  'params' : {}
-};
-</script>
-<script type="text/javascript" src="https://www.highperformanceformat.com/2c6dbe338bfe942aba8e44ed0a288e48/invoke.js"></script>
-</body></html>`;
-
-    iframe.srcdoc = html;
-    container.appendChild(iframe);
+    const script = document.createElement('script');
+    script.async = true;
+    script.setAttribute('data-cfasync', 'false');
+    script.src = 'https://pl30569233.profitableratecpmnetwork.com/e474628fdcec06f52100e0b84b3fa759/invoke.js';
+    document.body.appendChild(script);
   }, [video.id]);
 
   // ── নতুন: ওপরের ব্যানার অ্যাডের (২c6dbe...) হুবহু কপি — related videos
@@ -570,44 +553,6 @@ atOptions = {
     iframe.srcdoc = html;
     container.appendChild(iframe);
   }, [hasMoreToLoad, video.id]);
-
-  // ── নতুন: EroAdvertising ইন-পেজ ভিডিও অ্যাড (eaCtrl, plugin: inpage_video)।
-  // eaCtrl.add() কল করলে স্ক্রিপ্টটা নিজে থেকেই sp_8222501_node div-এ ভিডিও
-  // বসিয়ে অটোপ্লে করে; ইউজার স্ক্রল করে div-টা viewport থেকে বের হয়ে গেলে
-  // eaCtrl নিজে থেকেই ভিডিওটাকে ছোট করে ফ্লোট করিয়ে দেয় (বিল্ট-ইন ফিচার,
-  // আলাদা কোড লাগে না)। আমরা CSS দিয়ে div-টাকে সবসময় স্ক্রিনের নিচে ফিক্সড
-  // রেখেছি (নিচের JSX + .inpage-video-ad-wrap স্টাইল দেখো), তাই এটা সবসময়ই
-  // ফোনের নিচের দিকে ভাসমান ভিডিও আকারে থাকবে। ──
-  useEffect(() => {
-    const container = document.getElementById('sp_8222501_node');
-    if (!container || container.dataset.loaded) return;
-    container.dataset.loaded = 'true';
-
-    if (typeof window.eaCtrl === 'undefined') {
-      window.eaCtrlRecs = [];
-      window.eaCtrl = { add: function (ag) { window.eaCtrlRecs.push(ag); } };
-      const js = document.createElement('script');
-      js.setAttribute('src', '//go.easrv.cl/loadeactrl.go?pid=155365&spaceid=8222501&ctrlid=799972');
-      document.head.appendChild(js);
-    }
-
-    window.eaCtrl.add({
-      plugin: 'inpage_video',
-      sid: 8222501,
-      display: 'sp_8222501_node',
-      skip_btn: true,
-      skip_after_sec: 5,
-      show_countdown: true,
-      skip_position: 'top-right',
-      auto_hide: true,
-      controls: false,
-      muted: true,
-      autoplay: true,
-      loop: true,
-      advertise: 'Advertisement'
-    });
-  }, [video.id]);
-
 
   function toggleLike() {
     const newLikes = { ...likes };
@@ -732,7 +677,6 @@ atOptions = {
           .iframe-click-gate img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0.75;}
           .iframe-click-gate .play-btn-icon{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:64px;height:64px;border-radius:50%;background:rgba(255,61,61,0.9);display:flex;align-items:center;justify-content:center;color:#fff;font-size:24px;box-shadow:0 4px 16px rgba(0,0,0,0.5);}
           .video-overlay{position:absolute;inset:0;width:100%;height:100%;background:transparent;cursor:pointer;z-index:10;}
-          .inpage-video-ad-wrap{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:299;max-width:426px;width:92vw;}
         `}</style>
       </Head>
 
@@ -741,15 +685,6 @@ atOptions = {
           <a className="logo" href="/">ViralLink<span>BD</span></a>
         </div>
       </header>
-
-      {/* স্টিকি বটম ব্যানার অ্যাড (320x50) — স্ক্রিনের নিচ থেকে সামান্য উপরে ভাসমান।
-          ক্রস বাটনে প্রথম ক্লিকে স্মার্টলিংক ওপেন হয়, দ্বিতীয় ক্লিকে অ্যাড বন্ধ হয়ে
-          যায় (১ মিনিট পর আবার ফিরে আসে)। container সবসময় DOM-এ থাকে,
-          শুধু visibility CSS দিয়ে টগল হয়, তাই অ্যাড বারবার reload হয় না। */}
-      {/* EroAdvertising ইন-পেজ ভিডিও অ্যাড — ফোনের স্ক্রিনের নিচের দিকে ভাসমান ভিডিও আকারে দেখাবে */}
-      <div className="inpage-video-ad-wrap">
-        <div id="sp_8222501_node" style={{ maxWidth: '426px', maxHeight: '240px', display: 'none' }}>&nbsp;</div>
-      </div>
 
       <div className="main">
         <a className="back-btn" href="/" onClick={handleBackClick}>← হোমে ফিরুন</a>
@@ -908,13 +843,15 @@ atOptions = {
         </div>
 
         {/* Native Banner Ad - below related videos (highperformanceformat 728x90) */}
-        <div style={{display:'flex',justifyContent:'center',margin:'1rem 0'}} id="native-banner-related"></div>
+        <div style={{display:'flex',justifyContent:'center',margin:'1rem 0'}}>
+          <div id="container-e474628fdcec06f52100e0b84b3fa759"></div>
+        </div>
 
         {/* ── Infinite scroll: অ্যাডের নিচে ইউজার স্ক্রল করলে ধীরে ধীরে
              আরও related videos লোড হয়ে এখানে দেখানো হবে ── */}
         {extraRelated.length > 0 && (
           <>
-            <div className="related-section-title" style={{ marginTop: '1rem' }}>আরও ভিডিও</div>
+            <div className="related-section-title" style={{ marginTop: '1rem' }}>More Videos</div>
             <div className="related-list">
               {extraRelated.map(v => (
                 <a key={v.id} className="related-card" href={`/video/${v.slug}`} onClick={e => handleRelatedClick(e, v.slug)}>
