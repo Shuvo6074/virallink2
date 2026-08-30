@@ -843,16 +843,17 @@ atOptions = {
         </div>
 
         {/* Native Banner Ad - below related videos (highperformanceformat 728x90) */}
-        <div style={{display:'flex',justifyContent:'center',margin:'1rem 0'}}>
+        <div style={{display:'flex',justifyContent:'center',margin:'0.5rem 0'}}>
           <div id="container-e474628fdcec06f52100e0b84b3fa759"></div>
         </div>
 
         {/* ── Infinite scroll: অ্যাডের নিচে ইউজার স্ক্রল করলে ধীরে ধীরে
-             আরও related videos লোড হয়ে এখানে দেখানো হবে ── */}
+             আরও related videos লোড হয়ে এখানে দেখানো হবে। "More Videos" টাইটেল
+             সরিয়ে দেওয়া হলো, যাতে অ্যাডের উপরে-নিচে অযথা গ্যাপ না থাকে —
+             এখন শুধু ছোট একটা মার্জিন (উপরের 0.5rem) রাখা হয়েছে। ── */}
         {extraRelated.length > 0 && (
           <>
-            <div className="related-section-title" style={{ marginTop: '1rem' }}>More Videos</div>
-            <div className="related-list">
+            <div className="related-list" style={{ marginTop: '0.5rem' }}>
               {extraRelated.map(v => (
                 <a key={v.id} className="related-card" href={`/video/${v.slug}`} onClick={e => handleRelatedClick(e, v.slug)}>
                   <div className="related-thumb">
