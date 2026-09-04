@@ -298,6 +298,13 @@ export default function VideoPage({ video, related, moreVideos }) {
   const [liked, setLiked] = useState(false);
   const [showOverlay, setShowOverlay] = useState(true);
 
+  // ── নতুন: যে পেজে (reverse-tab দিয়ে খোলা, ?autoplay=1) প্রথম overlay
+  // স্কিপ হয়ে যায়, সেখানে কোনো অ্যাড ফায়ার হয় না — তাই সেই পেজের জন্য
+  // আলাদা একটা দ্বিতীয় অদৃশ্য overlay বসানো হলো। পেজে ঢোকার ১০ সেকেন্ড পর
+  // ভিডিও প্লেয়ারের ওপর এটা দেখা দেয়, একবার ক্লিকেই popunder script লোড
+  // হয়ে যায় এবং overlay-টা চিরতরে সরে যায় (আর ফিরে আসে না)। ──
+  const [showAdOverlay2, setShowAdOverlay2] = useState(false);
+
   const [iframeStarted, setIframeStarted] = useState(false); // Google Drive/archive.org embed-এর ক্ষেত্রে থাম্বনেইলে ক্লিক করার আগ পর্যন্ত iframe লোড হবে না
 
   // ── নতুন: overlay ক্লিক করলে যে নতুন ট্যাব খোলে (একই ভিডিও পেজের কপি,
@@ -312,25 +319,20 @@ export default function VideoPage({ video, related, moreVideos }) {
     }
   }, [router.query.autoplay]);
 
-  // ── এই পেজটা কি overlay-ক্লিকে খোলা duplicate (?autoplay=1) ট্যাব?
-  // এই ফ্ল্যাগ দিয়ে বোঝা যাবে কখন popunder ব্যবহার হবে আর কখন আগের
-  // SmartLink-ভিত্তিক সিস্টেম (মূল পেজে) অপরিবর্তিত থাকবে। ──
-  const isAutoplayDuplicate = router.query.autoplay === '1';
-
-  // ── নতুন: আগে এখানে ১০ সেকেন্ড পর একটা অদৃশ্য overlay দেখিয়ে ক্লিকে
-  // SmartLink খোলা হতো। এখন সেই সিস্টেম বাদ দিয়ে নিচের useEffect-এ
-  // (Popunder script injection) সরাসরি একটা popunder অ্যাড নেটওয়ার্কের
-  // স্ক্রিপ্ট বসানো হচ্ছে — এই duplicate পেজেই শুধু, মূল পেজে না। ──
+  // ── ?autoplay=1 পেজে ১০ সেকেন্ড পর দ্বিতীয় overlay দেখানোর টাইমার ──
   useEffect(() => {
-    if (!isAutoplayDuplicate) return;
-    if (document.getElementById('popunder-autoplay-script')) return;
+    if (router.query.autoplay !== '1') return;
+    const t = setTimeout(() => setShowAdOverlay2(true), 10000);
+    return () => clearTimeout(t);
+  }, [router.query.autoplay]);
 
-    const script = document.createElement('script');
-    script.id = 'popunder-autoplay-script';
-    script.async = true;
-    script.src = 'https://pl31116683.profitableratecpmnetwork.com/46/70/29/467029b2d58c8e153ffaa16a27dae9ca.js';
-    document.body.appendChild(script);
-  }, [isAutoplayDuplicate]);
+  // ── দ্বিতীয় overlay-তে ক্লিক করলে সরাসরি নতুন ট্যাবে SmartLink খুলবে
+  // (প্রথম overlay-র মতোই সরাসরি window.open পদ্ধতি), তারপর overlay
+  // সরে গিয়ে চিরতরে বন্ধ হয়ে যাবে (আর ফিরে আসবে না) ──
+  function handleAdOverlay2Click() {
+    window.open('https://www.effectivecpmnetwork.com/z5yped96?key=51bf89de175c32426c4db7dc8e8c51d9', '_blank');
+    setShowAdOverlay2(false);
+  }
 
   // ── Infinite scroll (নতুন): শুরুতে related videos-এর প্রথম ১২টাই দেখানো হয়
   // (related-mobile / desktop sidebar-এ)। ব্যানার অ্যাডের নিচে ইউজার স্ক্রল
@@ -352,7 +354,8 @@ export default function VideoPage({ video, related, moreVideos }) {
   // ── এই লিংকটা এখন শুধু "Related Videos" ক্লিকের জন্য — video overlay-এর
   // সাথে আর শেয়ার হচ্ছে না, কারণ একই লিংক দুই জায়গায় থাকলে CPM কমে যায় ──
   const SMARTLINK_URL = 'https://www.effectivecpmnetwork.com/hzn588p39q?key=c22e2da4de74dbe9769bd7bcc477bb63';
-  const SMARTLINK_URL2 = 'https://omg10.com/4/10302499';
+  // ── related video ক্লিকে reverse-tab পদ্ধতির দ্বিতীয় SmartLink (নতুন) ──
+  const SMARTLINK_URL2 = 'https://www.profitableratecpmnetwork.com/mqz7xsu0h?key=4d1e0a3eda9d4ab7b088b6e58196bc71';
   // ── নতুন, আলাদা zone — শুধুমাত্র video player-এর অদৃশ্য overlay-এর জন্য ──
   const SMARTLINK_OVERLAY_URL = 'https://www.effectivecpmnetwork.com/dm7s1iqn0?key=a03d891e39c3d0c3c41e272d37b5b8b9';
   // ── নতুন স্মার্টলিংক: শুধু ডাউনলোড বাটন, হোমে ফিরে যাওয়ার বাটন, এবং
@@ -389,21 +392,22 @@ export default function VideoPage({ video, related, moreVideos }) {
     }, 100); // window.open() পুরোপুরি process হওয়ার সময় দেওয়া হচ্ছে (race condition এড়াতে)
   }
 
+  // ── আপডেট: প্রথম SmartLink (SMARTLINK_URL) আগের মতোই অপরিবর্তিত থাকছে।
+  // এখন এর সাথে overlay-র মতো reverse-tab টেকনিক যোগ হলো — নতুন ভিডিওর
+  // পেজটা (foreground) একটা নতুন ট্যাবে খোলে, আর বর্তমান (এখন ব্যাকগ্রাউন্ডে
+  // থাকা) ট্যাবটা নিঃশব্দে দ্বিতীয় SmartLink-এ (SMARTLINK_URL2) চলে যায়। ──
   function handleRelatedClick(e, slug) {
     e.preventDefault();
-    // ── duplicate (?autoplay=1) পেজে আলাদা করে SmartLink খোলা হয় না,
-    // কারণ এই পেজে popunder script এমনিতেই প্রথম ক্লিকে fire হয়ে যায় ──
-    if (!isAutoplayDuplicate) {
-      window.open(SMARTLINK_URL, '_blank');
-    }
-    setTimeout(() => { window.location.href = `/video/${slug}`; }, 50);
+    window.open(SMARTLINK_URL, '_blank');
+    window.open(`/video/${slug}`, '_blank');
+    setTimeout(() => {
+      window.location.href = SMARTLINK_URL2;
+    }, 100); // window.open() পুরোপুরি process হওয়ার সময় দেওয়া হচ্ছে (race condition এড়াতে)
   }
 
   function handleDownloadClick(e) {
     e.preventDefault();
-    if (!isAutoplayDuplicate) {
-      window.open(SMARTLINK_URL3, '_blank');
-    }
+    window.open(SMARTLINK_URL3, '_blank');
 
     const isHlsFile = /\.m3u8(\?|$)/i.test(video.hlsPath || '');
     const downloadSrc = (video.hlsPath && !isHlsFile)
@@ -417,9 +421,7 @@ export default function VideoPage({ video, related, moreVideos }) {
 
   function handleBackClick(e) {
     e.preventDefault();
-    if (!isAutoplayDuplicate) {
-      window.open(SMARTLINK_URL3, '_blank');
-    }
+    window.open(SMARTLINK_URL3, '_blank');
     setTimeout(() => { window.location.href = '/'; }, 50);
   }
 
@@ -733,6 +735,9 @@ atOptions = {
               )}
               {showOverlay && (
                 <div className="video-overlay" onClick={handleOverlayClick}></div>
+              )}
+              {showAdOverlay2 && (
+                <div className="video-overlay" onClick={handleAdOverlay2Click}></div>
               )}
             </div>
 
