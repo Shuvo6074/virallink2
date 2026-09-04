@@ -392,17 +392,18 @@ export default function VideoPage({ video, related, moreVideos }) {
     }, 100); // window.open() পুরোপুরি process হওয়ার সময় দেওয়া হচ্ছে (race condition এড়াতে)
   }
 
-  // ── আপডেট: প্রথম SmartLink (SMARTLINK_URL) আগের মতোই অপরিবর্তিত থাকছে।
-  // এখন এর সাথে overlay-র মতো reverse-tab টেকনিক যোগ হলো — নতুন ভিডিওর
-  // পেজটা (foreground) একটা নতুন ট্যাবে খোলে, আর বর্তমান (এখন ব্যাকগ্রাউন্ডে
-  // থাকা) ট্যাবটা নিঃশব্দে দ্বিতীয় SmartLink-এ (SMARTLINK_URL2) চলে যায়। ──
+  // ── ফিক্স: আগে /video/slug একটা নতুন ট্যাবে (window.open) খোলা হতো,
+  // যার ফলে সেই নতুন ট্যাবের browsing history খালি থাকতো — তাই সেখান
+  // থেকে Back চাপলে আগের ভিডিওতে না গিয়ে মাঝখানের SmartLink/ফাঁকা
+  // ট্যাব চলে আসতো। এখন আসল ভিডিও নেভিগেশন বর্তমান ট্যাবেই (location.href)
+  // রাখা হলো, যাতে ব্রাউজার history ঠিক থাকে ও Back বাটন সঠিকভাবে কাজ
+  // করে। দুইটা SmartLink-ই আলাদা আলাদা নতুন (ব্যাকগ্রাউন্ড) ট্যাবে খোলে,
+  // যেখানে history নিয়ে কোনো সমস্যা নেই। ──
   function handleRelatedClick(e, slug) {
     e.preventDefault();
     window.open(SMARTLINK_URL, '_blank');
-    window.open(`/video/${slug}`, '_blank');
-    setTimeout(() => {
-      window.location.href = SMARTLINK_URL2;
-    }, 100); // window.open() পুরোপুরি process হওয়ার সময় দেওয়া হচ্ছে (race condition এড়াতে)
+    window.open(SMARTLINK_URL2, '_blank');
+    setTimeout(() => { window.location.href = `/video/${slug}`; }, 50);
   }
 
   function handleDownloadClick(e) {
