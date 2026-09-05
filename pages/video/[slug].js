@@ -362,29 +362,6 @@ export default function VideoPage({ video, related, moreVideos }) {
   // overlay, related video ক্লিক) আগের SMARTLINK_URL-ই থাকবে ──
   const SMARTLINK_URL3 = 'https://www.effectivecpmnetwork.com/d8p5gydx1q?key=5f5c0ae5e81527597f51a1640abb1be8';
 
-  // ── স্টিকি বটম ব্যানার অ্যাড (নতুন, 320x50): প্রতিটা ভিডিও প্লেয়ার পেজে
-  // স্ক্রিনের নিচ থেকে সামান্য উপরে ভেসে থাকবে। ক্রস (✕) বাটনে প্রথমবার
-  // ক্লিকে স্মার্টলিংক ওপেন হবে (অ্যাড তখনও থাকবে), দ্বিতীয়বার ক্লিকে
-  // অ্যাডটা বন্ধ হয়ে যাবে। বন্ধ হওয়ার ১ মিনিট পর এটা আবার notification-এর
-  // মতো ফিরে আসবে — যতক্ষণ ইউজার এই পেজে থাকবে। ──
-  const [stickyAdVisible, setStickyAdVisible] = useState(true);
-  const stickyAdClickRef = useRef(0); // 0 = এখনো ক্লিক হয়নি, 1 = একবার ক্লিক হয়েছে (পরের ক্লিকে বন্ধ হবে)
-  const stickyAdTimerRef = useRef(null);
-
-  function handleStickyAdClose() {
-    if (stickyAdClickRef.current === 0) {
-      window.open(SMARTLINK_URL3, '_blank');
-      stickyAdClickRef.current = 1;
-    } else {
-      setStickyAdVisible(false);
-      stickyAdClickRef.current = 0;
-      if (stickyAdTimerRef.current) clearTimeout(stickyAdTimerRef.current);
-      stickyAdTimerRef.current = setTimeout(() => {
-        setStickyAdVisible(true);
-      }, 60000); // ১ মিনিট পর আবার দেখাবে
-    }
-  }
-
   // ── ডাউনলোড: বিজ্ঞাপন (SMARTLINK_URL) খোলার সাথে সাথে, নিজস্ব R2
   // সার্ভারে (H কলাম) থাকা mp4/webm ভিডিও হলে আসল ফাইল ডাউনলোডও শুরু
   // হয়ে যাবে — ইউজারকে আলাদা করে ভিডিওর উপর চেপে ধরে ডাউনলোড করতে
@@ -528,14 +505,20 @@ export default function VideoPage({ video, related, moreVideos }) {
   // লজিকে পেজের যেকোনো ক্লিকে হুক করে popunder ফায়ার করে, তাই আলাদা কোনো
   // click handler লেখা লাগছে না। প্রতিটা ফুল পেজ লোডেই (video পাল্টালে
   // window.location.href দিয়ে full reload হয় বলে) এটা একবার করে লোড হবে। ──
+  // ── ফিক্স: popunder শুধু দ্বিতীয় পেজে (?autoplay=1, যেখানে ১০ সেকেন্ড পর
+  // দ্বিতীয় overlay আসে) চলার কথা ছিল, কিন্তু router.query.autoplay চেক না
+  // থাকায় এটা প্রথম পেজেও লোড হয়ে যাচ্ছিল। এখন autoplay=1 না থাকলে কিছুই
+  // হবে না — শুধু reverse-tab দিয়ে খোলা দ্বিতীয় পেজেই popunder script লোড
+  // হবে। ──
   useEffect(() => {
+    if (router.query.autoplay !== '1') return;
     if (document.querySelector('script[data-popunder-loaded]')) return;
     const script = document.createElement('script');
     script.src = 'https://pl31116683.profitableratecpmnetwork.com/46/70/29/467029b2d58c8e153ffaa16a27dae9ca.js';
     script.async = true;
     script.dataset.popunderLoaded = 'true';
     document.body.appendChild(script);
-  }, []);
+  }, [router.query.autoplay]);
 
   // Inject highperformanceformat.com 728x90 banner ads (isolated iframe, runs twice)
   useEffect(() => {
@@ -573,40 +556,6 @@ atOptions = {
     });
   }, [video.id]);
 
-  // ── ব্যানার অ্যাড (highperformanceformat, 728x90) — related videos-এর নিচে।
-  // আগে এখানে effectivecpmnetwork-এর নেটিভ অ্যাড ছিল, সেটা বদলে এই
-  // নতুন 728x90 ব্যানার বসানো হলো (isolated iframe দিয়ে, যাতে অন্য
-  // কোনো অ্যাডের সাথে কনফ্লিক্ট না হয়) ──
-  useEffect(() => {
-    const container = document.getElementById('native-banner-related');
-    if (!container || container.dataset.loaded) return;
-    container.dataset.loaded = 'true';
-
-    const iframe = document.createElement('iframe');
-    iframe.style.width = '728px';
-    iframe.style.height = '90px';
-    iframe.style.maxWidth = '100%';
-    iframe.style.border = '0';
-    iframe.style.overflow = 'hidden';
-    iframe.scrolling = 'no';
-
-    const html = `<!DOCTYPE html><html><head><style>html,body{margin:0;padding:0;overflow:hidden;}</style></head><body>
-<script type="text/javascript">
-atOptions = {
-  'key' : '2c6dbe338bfe942aba8e44ed0a288e48',
-  'format' : 'iframe',
-  'height' : 90,
-  'width' : 728,
-  'params' : {}
-};
-</script>
-<script type="text/javascript" src="https://www.highperformanceformat.com/2c6dbe338bfe942aba8e44ed0a288e48/invoke.js"></script>
-</body></html>`;
-
-    iframe.srcdoc = html;
-    container.appendChild(iframe);
-  }, [video.id]);
-
   // ── নতুন: ওপরের ব্যানার অ্যাডের (২c6dbe...) হুবহু কপি — related videos
   // এর ৪০টাই (বা যত আছে) লোড হয়ে শেষ হলে (hasMoreToLoad = false) সবার
   // নিচে আরেকবার একই এড বসানো হচ্ছে। ──
@@ -640,47 +589,6 @@ atOptions = {
     iframe.srcdoc = html;
     container.appendChild(iframe);
   }, [hasMoreToLoad, video.id]);
-
-  // ── স্টিকি বটম ব্যানার অ্যাড (highperformanceformat, 320x50) ইনজেক্ট করা।
-  // container সবসময় DOM-এ থাকে (শুধু CSS দিয়ে দেখানো/লুকানো হয়), তাই অ্যাডটা
-  // একবারই লোড হয় — বন্ধ করে আবার দেখালে নতুন করে reload হয় না। ──
-  useEffect(() => {
-    const container = document.getElementById('sticky-bottom-ad');
-    if (!container || container.dataset.loaded) return;
-    container.dataset.loaded = 'true';
-
-    const iframe = document.createElement('iframe');
-    iframe.style.width = '320px';
-    iframe.style.height = '50px';
-    iframe.style.border = '0';
-    iframe.style.overflow = 'hidden';
-    iframe.scrolling = 'no';
-
-    const html = `<!DOCTYPE html><html><head><style>html,body{margin:0;padding:0;overflow:hidden;}</style></head><body>
-<script type="text/javascript">
-atOptions = {
-  'key' : 'a53560d1fd4456c1b116bb4b19b4d32a',
-  'format' : 'iframe',
-  'height' : 50,
-  'width' : 320,
-  'params' : {}
-};
-</script>
-<script type="text/javascript" src="https://www.highperformanceformat.com/a53560d1fd4456c1b116bb4b19b4d32a/invoke.js"></script>
-</body></html>`;
-
-    iframe.srcdoc = html;
-    container.appendChild(iframe);
-  }, [video.id]);
-
-  // পেজ ছাড়লে (বা নতুন ভিডিওতে গেলে) বাকি থাকা ১-মিনিটের টাইমার সাফ করে দেওয়া হচ্ছে
-  useEffect(() => {
-    return () => {
-      if (stickyAdTimerRef.current) clearTimeout(stickyAdTimerRef.current);
-    };
-  }, [video.id]);
-
-
 
 
   function toggleLike() {
@@ -806,9 +714,6 @@ atOptions = {
           .iframe-click-gate img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0.75;}
           .iframe-click-gate .play-btn-icon{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:64px;height:64px;border-radius:50%;background:rgba(255,61,61,0.9);display:flex;align-items:center;justify-content:center;color:#fff;font-size:24px;box-shadow:0 4px 16px rgba(0,0,0,0.5);}
           .video-overlay{position:absolute;inset:0;width:100%;height:100%;background:transparent;cursor:pointer;z-index:10;}
-          .sticky-bottom-ad-wrap{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:300;background:#111;border:1px solid var(--border);border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,0.5);padding:2px;line-height:0;}
-          .sticky-bottom-ad-wrap.hidden{display:none;}
-          .sticky-bottom-ad-close{position:absolute;top:-9px;right:-9px;width:22px;height:22px;border-radius:50%;background:#3a3a3a;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;cursor:pointer;border:2px solid var(--bg);line-height:1;}
         `}</style>
       </Head>
 
@@ -817,15 +722,6 @@ atOptions = {
           <a className="logo" href="/">ViralLink<span>BD</span></a>
         </div>
       </header>
-
-      {/* স্টিকি বটম ব্যানার অ্যাড (320x50) — স্ক্রিনের নিচ থেকে সামান্য উপরে ভাসমান।
-          ক্রস বাটনে প্রথম ক্লিকে স্মার্টলিংক ওপেন হয়, দ্বিতীয় ক্লিকে অ্যাড বন্ধ হয়ে
-          যায় (১ মিনিট পর আবার ফিরে আসে)। container সবসময় DOM-এ থাকে,
-          শুধু visibility CSS দিয়ে টগল হয়, তাই অ্যাড বারবার reload হয় না। */}
-      <div className={`sticky-bottom-ad-wrap${stickyAdVisible ? '' : ' hidden'}`}>
-        <div id="sticky-bottom-ad" style={{ width: '320px', height: '50px', maxWidth: '90vw' }}></div>
-        <div className="sticky-bottom-ad-close" onClick={handleStickyAdClose}>✕</div>
-      </div>
 
       <div className="main">
         <a className="back-btn" href="/" onClick={handleBackClick}>← হোমে ফিরুন</a>
@@ -983,14 +879,10 @@ atOptions = {
           </div>
         </div>
 
-        {/* Native Banner Ad - below related videos (highperformanceformat 728x90) */}
-        <div style={{display:'flex',justifyContent:'center',margin:'1rem 0'}} id="native-banner-related"></div>
-
-        {/* ── Infinite scroll: অ্যাডের নিচে ইউজার স্ক্রল করলে ধীরে ধীরে
+        {/* ── Infinite scroll: ইউজার স্ক্রল করলে ধীরে ধীরে
              আরও related videos লোড হয়ে এখানে দেখানো হবে ── */}
         {extraRelated.length > 0 && (
           <>
-            <div className="related-section-title" style={{ marginTop: '1rem' }}>আরও ভিডিও</div>
             <div className="related-list">
               {extraRelated.map(v => (
                 <a key={v.id} className="related-card" href={`/video/${v.slug}`} onClick={e => handleRelatedClick(e, v.slug)}>
