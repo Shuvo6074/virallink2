@@ -556,6 +556,23 @@ atOptions = {
     });
   }, [video.id]);
 
+  // ── নতুন: related videos-এর প্রথম ১২টার পর profitableratecpmnetwork-এর
+  // container-based banner অ্যাড (আগে এখানে highperformanceformat-এর
+  // 728x90 ছিল, সেটার বদলে এই নতুনটা বসানো হলো)। ইউজারের দেওয়া কোডে
+  // script আর div sibling হিসেবে ছিল, তাই এখানেও script-টা container
+  // div-এর ঠিক আগে বসানো হচ্ছে যাতে নেটওয়ার্কের নিজস্ব লজিক ঠিকভাবে
+  // ওই div-টাকেই খুঁজে পায়। ──
+  useEffect(() => {
+    const el = document.getElementById('container-e474628fdcec06f52100e0b84b3fa759');
+    if (!el || el.dataset.loaded) return;
+    el.dataset.loaded = 'true';
+    const script = document.createElement('script');
+    script.src = 'https://pl30569233.profitableratecpmnetwork.com/e474628fdcec06f52100e0b84b3fa759/invoke.js';
+    script.async = true;
+    script.setAttribute('data-cfasync', 'false');
+    el.parentNode.insertBefore(script, el);
+  }, [video.id]);
+
   // ── নতুন: ওপরের ব্যানার অ্যাডের (২c6dbe...) হুবহু কপি — related videos
   // এর ৪০টাই (বা যত আছে) লোড হয়ে শেষ হলে (hasMoreToLoad = false) সবার
   // নিচে আরেকবার একই এড বসানো হচ্ছে। ──
@@ -878,6 +895,8 @@ atOptions = {
             </div>
           </div>
         </div>
+
+        <div id="container-e474628fdcec06f52100e0b84b3fa759"></div>
 
         {/* ── Infinite scroll: ইউজার স্ক্রল করলে ধীরে ধীরে
              আরও related videos লোড হয়ে এখানে দেখানো হবে ── */}
