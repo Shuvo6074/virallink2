@@ -20,6 +20,25 @@ function formatNum(n) {
   return n.toString();
 }
 
+// ── নতুন: ভিডিওর দৈর্ঘ্য (duration) থাম্বনেইলের উপর দেখানোর জন্য ফরম্যাট
+// করে। Sheet-এর কলাম F (duration)-এ যদি আগে থেকেই "3:45" বা "1:02:10"
+// এর মতো লেখা থাকে সেটা যেমন আছে তেমনই দেখানো হবে। আর যদি শুধু সংখ্যা
+// (যেমন 225, মানে ২২৫ সেকেন্ড) লেখা থাকে, সেটাকে mm:ss (বা ১ ঘণ্টার
+// বেশি হলে h:mm:ss) ফরম্যাটে কনভার্ট করে দেখানো হবে। ──
+function formatDuration(raw) {
+  if (!raw) return '';
+  const str = raw.toString().trim();
+  if (!str) return '';
+  if (str.includes(':')) return str; // আগে থেকেই "3:45" ফরম্যাটে থাকলে সরাসরি ব্যবহার
+  const totalSeconds = Number(str);
+  if (isNaN(totalSeconds) || totalSeconds <= 0) return '';
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = Math.floor(totalSeconds % 60);
+  const pad = n => String(n).padStart(2, '0');
+  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
+}
+
 // ── Google Sheet-এ সেল "Date" টাইপ হলে gviz API সেটা প্লেইন টেক্সট না দিয়ে
 // "Date(2026,6,29)" এই অদ্ভুত ফরম্যাটে পাঠায় (মাস 0-based, তাই 6 = জুলাই)।
 // আবার তুমি যদি হাতে "29/07/2026" (DD/MM/YYYY) লেখো, সেটা প্লেইন টেক্সট
@@ -225,7 +244,7 @@ export async function getServerSideProps({ params, res: httpRes }) {
     // থাকুক না কেন (কয়েকশো/হাজার), এটাই ব্যবহার হবে "আরও ভিডিও" সেকশনে। ──
     const usedAfterRelated = new Set(related.map(v => v.id));
     usedAfterRelated.add(video.id);
-    const leanify = v => ({ id: v.id, title: v.title, thumbnail: v.thumbnail, categories: v.categories, date: v.date, slug: v.slug });
+    const leanify = v => ({ id: v.id, title: v.title, thumbnail: v.thumbnail, categories: v.categories, date: v.date, slug: v.slug, duration: v.duration });
     const moreVideos = allVideos.filter(v => !usedAfterRelated.has(v.id)).map(leanify);
 
     return { props: { video, related, moreVideos } };
@@ -301,8 +320,8 @@ export default function VideoPage({ video, related, moreVideos }) {
   // ── নতুন: যে পেজে (reverse-tab দিয়ে খোলা, ?autoplay=1) প্রথম overlay
   // স্কিপ হয়ে যায়, সেখানে কোনো অ্যাড ফায়ার হয় না — তাই সেই পেজের জন্য
   // আলাদা একটা দ্বিতীয় অদৃশ্য overlay বসানো হলো। পেজে ঢোকার ১০ সেকেন্ড পর
-  // ভিডিও প্লেয়ারের ওপর এটা দেখা দেয়, একবার ক্লিকেই popunder script লোড
-  // হয়ে যায় এবং overlay-টা চিরতরে সরে যায় (আর ফিরে আসে না)। ──
+  // ভিডিও প্লেয়ারের ওপর এটা দেখা দেয়, একবার ক্লিকেই SmartLink খুলে যায়
+  // এবং overlay-টা চিরতরে সরে যায় (আর ফিরে আসে না)। ──
   const [showAdOverlay2, setShowAdOverlay2] = useState(false);
 
   const [iframeStarted, setIframeStarted] = useState(false); // Google Drive/archive.org embed-এর ক্ষেত্রে থাম্বনেইলে ক্লিক করার আগ পর্যন্ত iframe লোড হবে না
@@ -498,27 +517,6 @@ export default function VideoPage({ video, related, moreVideos }) {
       .then(counts => setViews(counts))
       .catch(() => {});
   }, [video.id]);
-
-  // ── নতুন: Popunder ad (profitableratecpmnetwork) — সরাসরি এই পেজেই বসানো
-  // হলো, কারণ বাকি SmartLink গুলো ব্যাকগ্রাউন্ড ট্যাবে চলে যায় বলে ইউজার
-  // সেগুলো নাও দেখতে পারে (impression মিস)। এই স্ক্রিপ্ট নেটওয়ার্কের নিজস্ব
-  // লজিকে পেজের যেকোনো ক্লিকে হুক করে popunder ফায়ার করে, তাই আলাদা কোনো
-  // click handler লেখা লাগছে না। প্রতিটা ফুল পেজ লোডেই (video পাল্টালে
-  // window.location.href দিয়ে full reload হয় বলে) এটা একবার করে লোড হবে। ──
-  // ── ফিক্স: popunder শুধু দ্বিতীয় পেজে (?autoplay=1, যেখানে ১০ সেকেন্ড পর
-  // দ্বিতীয় overlay আসে) চলার কথা ছিল, কিন্তু router.query.autoplay চেক না
-  // থাকায় এটা প্রথম পেজেও লোড হয়ে যাচ্ছিল। এখন autoplay=1 না থাকলে কিছুই
-  // হবে না — শুধু reverse-tab দিয়ে খোলা দ্বিতীয় পেজেই popunder script লোড
-  // হবে। ──
-  useEffect(() => {
-    if (router.query.autoplay !== '1') return;
-    if (document.querySelector('script[data-popunder-loaded]')) return;
-    const script = document.createElement('script');
-    script.src = 'https://pl31116683.profitableratecpmnetwork.com/46/70/29/467029b2d58c8e153ffaa16a27dae9ca.js';
-    script.async = true;
-    script.dataset.popunderLoaded = 'true';
-    document.body.appendChild(script);
-  }, [router.query.autoplay]);
 
   // Inject highperformanceformat.com 728x90 banner ads (isolated iframe, runs twice)
   useEffect(() => {
@@ -717,6 +715,7 @@ atOptions = {
           .related-card:hover{box-shadow:0 4px 20px rgba(255,61,61,0.2);}
           .related-thumb{position:relative;width:100%;padding-top:56.25%;background:#000;overflow:hidden;}
           .related-thumb img{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;transition:transform 0.3s;}
+          .duration-badge{position:absolute;bottom:4px;right:4px;background:rgba(0,0,0,0.8);color:#fff;font-size:0.68rem;font-weight:600;padding:1px 5px;border-radius:4px;line-height:1.4;z-index:2;}
           .related-card:hover .related-thumb img{transform:scale(1.03);}
           .related-info{padding:0.5rem 0.6rem;}
           .related-title-text{font-size:0.78rem;font-weight:600;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;line-height:1.3;margin-bottom:0.25rem;}
@@ -844,6 +843,7 @@ atOptions = {
                           }
                         }}
                       />
+                      {formatDuration(v.duration) && <span className="duration-badge">{formatDuration(v.duration)}</span>}
                     </div>
                     <div className="related-info">
                       <div className="related-title-text">{v.title}</div>
@@ -881,6 +881,7 @@ atOptions = {
                         }
                       }}
                     />
+                    {formatDuration(v.duration) && <span className="duration-badge">{formatDuration(v.duration)}</span>}
                   </div>
                   <div className="related-info">
                     <div className="related-title-text">{v.title}</div>
@@ -919,6 +920,7 @@ atOptions = {
                         }
                       }}
                     />
+                    {formatDuration(v.duration) && <span className="duration-badge">{formatDuration(v.duration)}</span>}
                   </div>
                   <div className="related-info">
                     <div className="related-title-text">{v.title}</div>
