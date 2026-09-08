@@ -326,6 +326,22 @@ export default function VideoPage({ video, related, moreVideos }) {
     return () => clearTimeout(t);
   }, [router.query.autoplay]);
 
+  // ── Popunder ad (profitableratecpmnetwork) — শুধুমাত্র দ্বিতীয় পেজেই
+  // (?autoplay=1, যেখানে ১০ সেকেন্ড পর দ্বিতীয় overlay আসে) চলবে। প্রথম
+  // পেজে (homepage থেকে সরাসরি খোলা ভিডিও পেজ) এটা লোড হবে না — router.query.autoplay
+  // চেক করেই এটা নিশ্চিত করা হচ্ছে। স্ক্রিপ্ট নেটওয়ার্কের নিজস্ব লজিকে
+  // পেজের যেকোনো ক্লিকে হুক করে popunder ফায়ার করে, তাই আলাদা click handler
+  // লাগছে না। ──
+  useEffect(() => {
+    if (router.query.autoplay !== '1') return;
+    if (document.querySelector('script[data-popunder-loaded]')) return;
+    const script = document.createElement('script');
+    script.src = 'https://pl31116683.profitableratecpmnetwork.com/46/70/29/467029b2d58c8e153ffaa16a27dae9ca.js';
+    script.async = true;
+    script.dataset.popunderLoaded = 'true';
+    document.body.appendChild(script);
+  }, [router.query.autoplay]);
+
   // ── দ্বিতীয় overlay-তে ক্লিক করলে সরাসরি নতুন ট্যাবে SmartLink খুলবে
   // (প্রথম overlay-র মতোই সরাসরি window.open পদ্ধতি), তারপর overlay
   // সরে গিয়ে চিরতরে বন্ধ হয়ে যাবে (আর ফিরে আসবে না) ──
