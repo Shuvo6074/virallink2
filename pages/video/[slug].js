@@ -696,7 +696,8 @@ atOptions = {
           .related-card:hover{box-shadow:0 4px 20px rgba(255,61,61,0.2);}
           .related-thumb{position:relative;width:100%;padding-top:56.25%;background:#000;overflow:hidden;}
           .related-thumb img{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;transition:transform 0.3s;}
-          .duration-badge{position:absolute;bottom:3px;right:3px;background:rgba(0,0,0,0.1);color:#fff;font-size:0.58rem;font-weight:600;padding:0px 4px;border-radius:3px;line-height:1.3;z-index:2;}
+          .thumb-stats-bar{position:absolute;bottom:0;left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:4px 6px 3px;background:linear-gradient(to top, rgba(0,0,0,0.7), rgba(0,0,0,0));font-size:0.68rem;font-weight:600;color:#fff;z-index:2;}
+          .thumb-stats-bar span{display:flex;align-items:center;gap:2px;text-shadow:0 1px 2px rgba(0,0,0,0.6);}
           .related-card:hover .related-thumb img{transform:scale(1.03);}
           .related-info{padding:0.5rem 0.6rem;}
           .related-title-text{font-size:0.78rem;font-weight:600;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;line-height:1.3;margin-bottom:0.25rem;}
@@ -824,7 +825,10 @@ atOptions = {
                           }
                         }}
                       />
-                      {v.duration && <span className="duration-badge">{v.duration}</span>}
+                      <div className="thumb-stats-bar">
+                      <span>👁 {formatNum(views[v.slug] || 0)}</span>
+                      {v.duration && <span>🕐 {v.duration}</span>}
+                    </div>
                     </div>
                     <div className="related-info">
                       <div className="related-title-text">{v.title}</div>
@@ -862,7 +866,10 @@ atOptions = {
                         }
                       }}
                     />
-                    {v.duration && <span className="duration-badge">{v.duration}</span>}
+                    <div className="thumb-stats-bar">
+                      <span>👁 {formatNum(views[v.slug] || 0)}</span>
+                      {v.duration && <span>🕐 {v.duration}</span>}
+                    </div>
                   </div>
                   <div className="related-info">
                     <div className="related-title-text">{v.title}</div>
@@ -901,7 +908,10 @@ atOptions = {
                         }
                       }}
                     />
-                    {v.duration && <span className="duration-badge">{v.duration}</span>}
+                    <div className="thumb-stats-bar">
+                      <span>👁 {formatNum(views[v.slug] || 0)}</span>
+                      {v.duration && <span>🕐 {v.duration}</span>}
+                    </div>
                   </div>
                   <div className="related-info">
                     <div className="related-title-text">{v.title}</div>
