@@ -1,3 +1,5 @@
+import { getSheetRows } from "../lib/sheetData";
+
 const SHEET_ID = '1CJU7TtQAvLGwVIrFB4G6uIyDy0m0Uz54kB6ZBpar4zE';
 
 function slugify(text) {
@@ -24,18 +26,7 @@ export async function getServerSideProps({ res }) {
   let sitemap = fallbackSitemap;
 
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
-
-    const response = await fetch(
-      `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json`,
-      { signal: controller.signal }
-    );
-    clearTimeout(timeoutId);
-
-    const text = await response.text();
-    const json = JSON.parse(text.substring(47, text.length - 2));
-    const rows = json.table.rows;
+    const rows = await getSheetRows();
     const today = new Date().toISOString().split('T')[0];
 
     const slugCounts = {};
