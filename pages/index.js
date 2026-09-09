@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import Head from "next/head";
+import { getSheetRows } from "../lib/sheetData";
 
 const SHEET_ID = '1CJU7TtQAvLGwVIrFB4G6uIyDy0m0Uz54kB6ZBpar4zE';
 const PER_PAGE = 30;
@@ -134,10 +135,7 @@ export async function getServerSideProps({ res: httpRes }) {
   httpRes.setHeader('Cache-Control', 'public, s-maxage=900, stale-while-revalidate=1800');
 
   try {
-    const res = await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID_SSR}/gviz/tq?tqx=out:json`);
-    const text = await res.text();
-    const json = JSON.parse(text.substring(47, text.length - 2));
-    const rows = json.table.rows;
+    const rows = await getSheetRows();
     const uniqueSlugs = getUniqueSlugs(rows, slugifySSR);
     const initialVideos = rows.map((row, i) => ({
       id: i,
