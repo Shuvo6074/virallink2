@@ -1,7 +1,31 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 
+// ── আগে শুধু Cache-Control header বসানো ছিল, যেটা Cloudflare-এ Cache Rule
+// ছাড়া আসলে কাজ করে না (dynamic API response এমনিতে edge-এ cache হয় না)।
+// এখন সরাসরি Cloudflare-এর Cache API (caches.default) ব্যবহার করে ৬০
+// সেকেন্ডের জন্য রেজাল্ট cache করা হচ্ছে — Cache Rule সেট করা থাক বা না
+// থাক, D1 database-এ বারবার query যাবে না। ──
+const CACHE_KEY_URL = 'https://internal-cache.virallink2.site/get-views-v1';
+const CACHE_TTL_SECONDS = 60;
+
 export default async function handler(req, res) {
   try {
+    let cache = null;
+    let cacheKeyReq = null;
+
+    try {
+      cache = caches.default;
+      cacheKeyReq = new Request(CACHE_KEY_URL);
+      const cached = await cache.match(cacheKeyReq);
+      if (cached) {
+        const counts = await cached.json();
+        res.setHeader('Cache-Control', `public, s-maxage=${CACHE_TTL_SECONDS}, stale-while-revalidate=120`);
+        return res.status(200).json(counts);
+      }
+    } catch (e) {
+      // cache না পাওয়া গেলেও নিচে সরাসরি DB থেকে ফ্রেশ ডেটা যাবে
+    }
+
     const { env } = getCloudflareContext();
 
     if (!env || !env.DB) {
@@ -11,13 +35,30 @@ export default async function handler(req, res) {
     const { results } = await env.DB.prepare('SELECT slug, count FROM views').all();
     const counts = {};
     results.forEach(r => { counts[r.slug] = r.count; });
-    // ── রিকোয়েস্ট কমানোর সবচেয়ে বড় ফিক্স: এই endpoint homepage, video
-    // page, tag page — সব জায়গা থেকে প্রতিটা পেজ-লোডে কল হয়। আগে মাত্র
-    // 10 সেকেন্ড cache ছিল, তাই ৩০০+ visitor থাকলে সেকেন্ডে বহুবার D1
-    // database হিট হচ্ছিল। View count প্রতি মুহূর্তে নিখুঁত হওয়ার দরকার
-    // নেই — 60 সেকেন্ড cache করলেও visitor এর চোখে কোনো পার্থক্য পড়বে
-    // না, কিন্তু database/Worker load অনেকাংশে কমে যাবে। ──
-    res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=120');
+
+    if (cache && cacheKeyReq) {
+      try {
+        const cacheResponse = new Response(JSON.stringify(counts), {
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': `public, max-age=${CACHE_TTL_SECONDS}`
+          }
+        });
+        let waited = false;
+        try {
+          const cfContext = await getCloudflareContext({ async: true });
+          if (cfContext?.ctx?.waitUntil) {
+            cfContext.ctx.waitUntil(cache.put(cacheKeyReq, cacheResponse));
+            waited = true;
+          }
+        } catch (e) {}
+        if (!waited) {
+          await cache.put(cacheKeyReq, cacheResponse);
+        }
+      } catch (e) {}
+    }
+
+    res.setHeader('Cache-Control', `public, s-maxage=${CACHE_TTL_SECONDS}, stale-while-revalidate=120`);
     return res.status(200).json(counts);
   } catch (e) {
     return res.status(500).json({ error: 'failed', detail: String(e), stack: e?.stack || null });
