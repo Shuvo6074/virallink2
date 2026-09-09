@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import Head from "next/head";
 import { useRouter } from "next/router";
+import { getSheetRows } from "../../lib/sheetData";
 
 const SHEET_ID = '1CJU7TtQAvLGwVIrFB4G6uIyDy0m0Uz54kB6ZBpar4zE';
 const SITE_URL = 'https://virallink2.site';
@@ -170,10 +171,7 @@ export async function getServerSideProps({ params, res: httpRes }) {
   httpRes.setHeader('Cache-Control', 'public, s-maxage=900, stale-while-revalidate=1800');
 
   try {
-    const res = await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json`);
-    const text = await res.text();
-    const json = JSON.parse(text.substring(47, text.length - 2));
-    const rows = json.table.rows;
+    const rows = await getSheetRows();
     const uniqueSlugs = getUniqueSlugs(rows, slugify);
 
     const allVideos = rows.map((row, i) => ({
