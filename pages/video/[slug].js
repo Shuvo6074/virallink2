@@ -88,11 +88,48 @@ function formatIso8601BD(date) {
 // প্রক্সি বাদ দিয়ে সরাসরি URL ব্যবহার করা হচ্ছে, কারণ wsrv.nl একসাথে
 // অনেক রিকোয়েস্ট পেলে rate-limit/timeout করে ফেলছিল (প্রথমবার কালো
 // থাম্বনেইল, রিলোডে ঠিক হওয়ার কারণ এটাই)। ──
-function thumbUrl(url, width) {
+function thumbUrl(url, width, quality) {
   if (!url) return url;
   if (url.includes('postimg.cc')) return url;
   const clean = url.replace(/^https?:\/\//, '');
-  return `https://wsrv.nl/?url=${encodeURIComponent(clean)}&w=${width}&q=75&output=webp`;
+  return `https://wsrv.nl/?url=${encodeURIComponent(clean)}&w=${width}&q=${quality || 75}&output=webp`;
+}
+
+// ── অ্যাডাপটিভ কোয়ালিটি (Facebook-এর ভিডিও নেট স্লো হলে রেজোলিউশন কমিয়ে
+// দেয় সেই আইডিয়া) — নেট স্পিড দেখে শুরুতেই ঠিক সাইজ/কোয়ালিটি বেছে
+// রিকোয়েস্ট/ডেটা খরচ কমানো হয়, বারবার রিট্রাই-নির্ভর না হয়ে ──
+function getAdaptiveQuality() {
+  const conn = typeof navigator !== 'undefined'
+    ? (navigator.connection || navigator.mozConnection || navigator.webkitConnection)
+    : null;
+  if (!conn) return { scale: 1, quality: 72 };
+  if (conn.saveData) return { scale: 0.45, quality: 35 };
+  switch (conn.effectiveType) {
+    case 'slow-2g':
+    case '2g':
+      return { scale: 0.4, quality: 35 };
+    case '3g':
+      return { scale: 0.65, quality: 55 };
+    default:
+      return { scale: 1, quality: 75 };
+  }
+}
+
+// ── থাম্বনেইল লোড ফেইল হ্যান্ডলার ──
+// আগে ফেইল করলে picsum.photos-এর এলোমেলো ছবি বসানো হতো। এখন মাত্র ২ বার
+// হালকা রিট্রাই হয় (রিকোয়েস্ট/ডেটা কম খরচ হয়), তাতেও ফেইল করলে ওপরের
+// ঝাপসা (blur) প্রিভিউ ছবিটাই থেকে যায় — আসল থাম্বনেইলেরই হালকা ভার্সন।
+function handleThumbError(e, thumbnail, width, quality) {
+  const img = e.target;
+  const attempts = parseInt(img.dataset.attempts || '0', 10);
+  const maxRetries = 2;
+  if (!thumbnail || attempts >= maxRetries) return;
+  img.dataset.attempts = String(attempts + 1);
+  const delay = attempts === 0 ? 1500 : 4000;
+  const cacheBust = `cb=${Date.now()}`;
+  setTimeout(() => {
+    img.src = `${thumbUrl(thumbnail, width, quality)}&${cacheBust}`;
+  }, delay);
 }
 
 // index.js-এর PER_PAGE-এর সাথে অবশ্যই মিলতে হবে, নাহলে pageBatch নম্বর গরমিল হবে
@@ -291,6 +328,10 @@ function ProtectedPlayer({ src }) {
 
 export default function VideoPage({ video, related, moreVideos }) {
   const router = useRouter();
+  // ── অ্যাডাপটিভ কোয়ালিটি: SSR-সেফ ডিফল্ট দিয়ে শুরু, মাউন্টের পর আসল
+  // নেট স্পিড অনুযায়ী আপডেট হয় (hydration mismatch এড়াতে) ──
+  const [imgQ, setImgQ] = useState({ scale: 1, quality: 72 });
+  useEffect(() => { setImgQ(getAdaptiveQuality()); }, []);
   const [likes, setLikes] = useState({});
   const [views, setViews] = useState({});
   const [liked, setLiked] = useState(false);
@@ -651,18 +692,15 @@ atOptions = {
         <meta property="og:image" content={video.thumbnail} />
         <meta property="og:site_name" content="ViralLink BD" />
         <meta name="twitter:card" content="summary_large_image" />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(videoSchema) }} />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }} />
         <style>{`
           :root{--bg:#0d0d0d;--surface:#181818;--surface2:#222;--accent:#ff3d3d;--text:#f5f5f5;--muted:#888;--border:#2a2a2a;--radius:10px;}
           *{margin:0;padding:0;box-sizing:border-box;}
-          body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;}
+          body{background:var(--bg);color:var(--text);font-family:var(--font-dm-sans),sans-serif;min-height:100vh;}
           header{background:#111;border-bottom:2px solid var(--accent);padding:0 4%;position:sticky;top:0;z-index:200;}
           .header-inner{max-width:1400px;margin:0 auto;display:flex;align-items:center;height:60px;gap:1rem;}
-          .logo{font-family:'Bebas Neue',sans-serif;font-size:1.8rem;letter-spacing:2px;color:var(--text);text-decoration:none;}
+          .logo{font-family:var(--font-bebas),sans-serif;font-size:1.8rem;letter-spacing:2px;color:var(--text);text-decoration:none;}
           .logo span{color:var(--accent);}
           .main{max-width:1400px;margin:0 auto;padding:1rem 2%;}
           .back-btn{display:inline-flex;align-items:center;gap:0.5rem;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:0.4rem 1rem;cursor:pointer;font-family:inherit;font-size:0.85rem;margin-bottom:1rem;text-decoration:none;transition:all 0.2s;}
@@ -686,7 +724,7 @@ atOptions = {
           .video-tags{display:flex;flex-wrap:wrap;gap:0.5rem;margin-bottom:1rem;}
           .tag-pill{display:inline-block;padding:0.3rem 0.75rem;background:var(--surface2);color:var(--muted);font-size:0.8rem;border-radius:999px;text-decoration:none;border:1px solid rgba(255,255,255,0.1);transition:background 0.15s,color 0.15s;}
           .tag-pill:hover{background:var(--accent);color:#fff;}
-          .related-section-title{font-family:'Bebas Neue',sans-serif;font-size:1.2rem;margin-bottom:1rem;letter-spacing:1px;}
+          .related-section-title{font-family:var(--font-bebas),sans-serif;font-size:1.2rem;margin-bottom:1rem;letter-spacing:1px;}
           .related-list{display:grid;grid-template-columns:repeat(2,1fr);gap:2px;}
           @media(min-width:600px){.related-list{grid-template-columns:repeat(3,1fr);}}
           @media(min-width:1024px){.player-layout .related-sidebar .related-list{grid-template-columns:repeat(2,1fr);}}
@@ -694,6 +732,9 @@ atOptions = {
           .related-card:hover{box-shadow:0 4px 20px rgba(255,61,61,0.2);}
           .related-thumb{position:relative;width:100%;padding-top:56.25%;background:#000;overflow:hidden;}
           .related-thumb img{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;transition:transform 0.3s;}
+          .thumb-blur{filter:blur(14px);transform:scale(1.15);}
+          .thumb-full{opacity:0;transition:opacity 0.35s ease;}
+          .thumb-full.loaded{opacity:1;}
           .duration-badge{position:absolute;bottom:4px;right:4px;background:rgba(0,0,0,0.45);color:#fff;font-size:0.62rem;font-weight:600;padding:1px 5px;border-radius:3px;line-height:1.3;z-index:2;}
           .related-card:hover .related-thumb img{transform:scale(1.03);}
           .related-info{padding:0.5rem 0.6rem;}
@@ -706,7 +747,10 @@ atOptions = {
           .ad-banner-slot{display:flex;justify-content:center;margin:1rem 0;overflow:hidden;}
           .ad-banner-slot iframe{max-width:100%;}
           .iframe-click-gate{position:absolute;inset:0;width:100%;height:100%;cursor:pointer;background:#000;}
-          .iframe-click-gate img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0.75;}
+          .iframe-click-gate img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+          .iframe-click-gate .thumb-blur{filter:blur(14px);transform:scale(1.15);opacity:0.75;}
+          .iframe-click-gate .thumb-full{opacity:0;transition:opacity 0.35s ease;}
+          .iframe-click-gate .thumb-full.loaded{opacity:0.75;}
           .iframe-click-gate .play-btn-icon{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:64px;height:64px;border-radius:50%;background:rgba(255,61,61,0.9);display:flex;align-items:center;justify-content:center;color:#fff;font-size:24px;box-shadow:0 4px 16px rgba(0,0,0,0.5);}
           .video-overlay{position:absolute;inset:0;width:100%;height:100%;background:transparent;cursor:pointer;z-index:10;}
         `}</style>
@@ -749,10 +793,13 @@ atOptions = {
                 // cross-origin iframe-এর ভিতরের ক্লিক ধরা যায় না, তাই থাম্বনেইল+▶ বসিয়ে
                 // প্রথম ক্লিকটা এখানেই ধরা হচ্ছে — এতে iframe লোড হয়
                 <div className="iframe-click-gate" onClick={() => setIframeStarted(true)}>
+                  <img className="thumb-blur" src={thumbUrl(video.thumbnail, 32, 30)} alt="" aria-hidden="true" />
                   <img
-                    src={thumbUrl(video.thumbnail, 640)}
+                    className="thumb-full"
+                    src={thumbUrl(video.thumbnail, Math.round(640 * imgQ.scale), imgQ.quality)}
                     alt={video.title}
-                    onError={e => { e.target.src = video.thumbnail; }}
+                    onLoad={e => e.target.classList.add('loaded')}
+                    onError={e => handleThumbError(e, video.thumbnail, Math.round(640 * imgQ.scale), imgQ.quality)}
                   />
                   <div className="play-btn-icon">▶</div>
                 </div>
@@ -809,18 +856,14 @@ atOptions = {
                 ) : initialRelated.map(v => (
                   <a key={v.id} className="related-card" href={`/video/${v.slug}`} onClick={e => handleRelatedClick(e, v.slug)}>
                     <div className="related-thumb">
+                      <img className="thumb-blur" src={thumbUrl(v.thumbnail, 20, 30)} alt="" aria-hidden="true" />
                       <img
-                        src={thumbUrl(v.thumbnail, 320)}
+                        className="thumb-full"
+                        src={thumbUrl(v.thumbnail, Math.round(320 * imgQ.scale), imgQ.quality)}
                         alt={v.title}
                         loading="lazy"
-                        onError={e => {
-                          if (e.target.dataset.fallback !== 'original' && v.thumbnail) {
-                            e.target.dataset.fallback = 'original';
-                            e.target.src = v.thumbnail;
-                          } else {
-                            e.target.src = `https://picsum.photos/seed/${v.id}/320/180`;
-                          }
-                        }}
+                        onLoad={e => e.target.classList.add('loaded')}
+                        onError={e => handleThumbError(e, v.thumbnail, Math.round(320 * imgQ.scale), imgQ.quality)}
                       />
                       {v.duration && <span className="duration-badge">{v.duration}</span>}
                     </div>
@@ -847,18 +890,14 @@ atOptions = {
               ) : initialRelated.map(v => (
                 <a key={v.id} className="related-card" href={`/video/${v.slug}`} onClick={e => handleRelatedClick(e, v.slug)}>
                   <div className="related-thumb">
+                    <img className="thumb-blur" src={thumbUrl(v.thumbnail, 20, 30)} alt="" aria-hidden="true" />
                     <img
-                      src={thumbUrl(v.thumbnail, 320)}
+                      className="thumb-full"
+                      src={thumbUrl(v.thumbnail, Math.round(320 * imgQ.scale), imgQ.quality)}
                       alt={v.title}
                       loading="lazy"
-                      onError={e => {
-                        if (e.target.dataset.fallback !== 'original' && v.thumbnail) {
-                          e.target.dataset.fallback = 'original';
-                          e.target.src = v.thumbnail;
-                        } else {
-                          e.target.src = `https://picsum.photos/seed/${v.id}/320/180`;
-                        }
-                      }}
+                      onLoad={e => e.target.classList.add('loaded')}
+                      onError={e => handleThumbError(e, v.thumbnail, Math.round(320 * imgQ.scale), imgQ.quality)}
                     />
                     {v.duration && <span className="duration-badge">{v.duration}</span>}
                   </div>
@@ -886,18 +925,14 @@ atOptions = {
               {extraRelated.map(v => (
                 <a key={v.id} className="related-card" href={`/video/${v.slug}`} onClick={e => handleRelatedClick(e, v.slug)}>
                   <div className="related-thumb">
+                    <img className="thumb-blur" src={thumbUrl(v.thumbnail, 20, 30)} alt="" aria-hidden="true" />
                     <img
-                      src={thumbUrl(v.thumbnail, 320)}
+                      className="thumb-full"
+                      src={thumbUrl(v.thumbnail, Math.round(320 * imgQ.scale), imgQ.quality)}
                       alt={v.title}
                       loading="lazy"
-                      onError={e => {
-                        if (e.target.dataset.fallback !== 'original' && v.thumbnail) {
-                          e.target.dataset.fallback = 'original';
-                          e.target.src = v.thumbnail;
-                        } else {
-                          e.target.src = `https://picsum.photos/seed/${v.id}/320/180`;
-                        }
-                      }}
+                      onLoad={e => e.target.classList.add('loaded')}
+                      onError={e => handleThumbError(e, v.thumbnail, Math.round(320 * imgQ.scale), imgQ.quality)}
                     />
                     {v.duration && <span className="duration-badge">{v.duration}</span>}
                   </div>
