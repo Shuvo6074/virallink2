@@ -79,10 +79,53 @@ function timeAgo(dateStr) {
 // হয়ে যাচ্ছিল, তাই মোবাইলের হাই-রেজোলিউশন স্ক্রিনে ঝাপসা/লো-কোয়ালিটি
 // দেখাচ্ছিল। width আর quality বাড়িয়ে HD-এর কাছাকাছি আনা হলো, তাও
 // original raw ছবির চেয়ে এখনো অনেক হালকা (webp + compress আছে)। ──
-function thumbUrl(url, width) {
+function thumbUrl(url, width, quality) {
   if (!url) return url;
   const clean = url.replace(/^https?:\/\//, '');
-  return `https://wsrv.nl/?url=${encodeURIComponent(clean)}&w=${width}&q=85&output=webp&n=-1`;
+  return `https://wsrv.nl/?url=${encodeURIComponent(clean)}&w=${width}&q=${quality || 85}&output=webp&n=-1`;
+}
+
+// ── অ্যাডাপটিভ কোয়ালিটি (Facebook-এর ভিডিও যেমন নেট স্লো হলে নিজে থেকেই
+// রেজোলিউশন কমিয়ে দেয়, ঠিক সেই আইডিয়া) ──
+// প্রতিবার রিট্রাই করে ভারী রিকোয়েস্ট পাঠানোর বদলে, শুরুতেই ফোনের নেট
+// স্পিড (Network Information API) দেখে ঠিক করা হয় কত সাইজ/কোয়ালিটির
+// ছবি চাওয়া হবে — নেট ফাস্ট হলে HD, স্লো হলে হালকা। ফলে রিকোয়েস্ট/ডেটা
+// খরচ কমে, আর প্রথমবারেই লোড হওয়ার সম্ভাবনা বেড়ে যায় (কম রিট্রাই লাগে)।
+// যেসব ব্রাউজারে এই API নেই (iOS Safari) সেখানে মাঝারি মানের ডিফল্ট থাকে।
+function getAdaptiveQuality() {
+  const conn = typeof navigator !== 'undefined'
+    ? (navigator.connection || navigator.mozConnection || navigator.webkitConnection)
+    : null;
+  if (!conn) return { scale: 1, quality: 78 };
+  if (conn.saveData) return { scale: 0.45, quality: 35 };
+  switch (conn.effectiveType) {
+    case 'slow-2g':
+    case '2g':
+      return { scale: 0.4, quality: 35 };
+    case '3g':
+      return { scale: 0.65, quality: 55 };
+    default:
+      return { scale: 1, quality: 85 };
+  }
+}
+
+// ── থাম্বনেইল লোড ফেইল হ্যান্ডলার ──
+// আগে ফেইল করলে সাথে সাথে picsum.photos-এর এলোমেলো ছবি বসিয়ে দেওয়া হতো।
+// এখন মাত্র ২ বার হালকা রিট্রাই করা হয় (বেশি রিট্রাই মানেই বেশি
+// রিকোয়েস্ট/ডেটা খরচ), আর তাতেও ফেইল করলে ওপরে থাকা ঝাপসা (blur)
+// প্রিভিউ ছবিটাই থেকে যায় — আসল থাম্বনেইলেরই একটা হালকা ভার্সন, তাই
+// কখনোই অপ্রাসঙ্গিক কোনো ছবি দেখানো হয় না।
+function handleThumbError(e, thumbnail, width, quality) {
+  const img = e.target;
+  const attempts = parseInt(img.dataset.attempts || '0', 10);
+  const maxRetries = 2;
+  if (!thumbnail || attempts >= maxRetries) return; // blur প্রিভিউটাই দেখা যাবে
+  img.dataset.attempts = String(attempts + 1);
+  const delay = attempts === 0 ? 1500 : 4000;
+  const cacheBust = `cb=${Date.now()}`;
+  setTimeout(() => {
+    img.src = `${thumbUrl(thumbnail, width, quality)}&${cacheBust}`;
+  }, delay);
 }
 
 // একটা ভিডিও একাধিক ক্যাটাগরিতে থাকতে পারবে — Sheets-এ কমা (,) দিয়ে
@@ -165,6 +208,10 @@ export default function Home({ initialVideos }) {
   const [loading, setLoading]       = useState(false);
   const [error, setError]           = useState('');
   const [views, setViews]           = useState({});
+  // ── অ্যাডাপটিভ কোয়ালিটি: প্রথমে SSR-সেফ ডিফল্ট, মাউন্ট হওয়ার পর
+  // আসল নেট স্পিড অনুযায়ী আপডেট হয় (hydration mismatch এড়াতে) ──
+  const [imgQ, setImgQ] = useState({ scale: 1, quality: 78 });
+  useEffect(() => { setImgQ(getAdaptiveQuality()); }, []);
 
   useEffect(() => {
     // ── ভিউ কাউন্ট (নতুন সিস্টেম): এখন Google Sheets-এর বদলে Cloudflare D1
@@ -384,21 +431,24 @@ atOptions = {'key':'${key}','format':'iframe','height':${height},'width':${width
                   }}
                 >
                   <div className="thumb-wrap">
+                    {/* ── ঝাপসা (blur) প্রিভিউ: খুব ছোট/হালকা, সব সময় সাথে সাথে দেখা যায় ── */}
                     <img
-                      src={thumbUrl(v.thumbnail, 480)}
+                      className="thumb-blur"
+                      src={thumbUrl(v.thumbnail, 32, 30)}
+                      alt=""
+                      aria-hidden="true"
+                      loading={i < 4 ? 'eager' : 'lazy'}
+                    />
+                    {/* ── আসল থাম্বনেইল: নেট স্পিড অনুযায়ী সাইজ/কোয়ালিটি, লোড হলে ফেইড-ইন ── */}
+                    <img
+                      className="thumb-full"
+                      src={thumbUrl(v.thumbnail, Math.round(480 * imgQ.scale), imgQ.quality)}
                       alt={`${v.title} - ভাইরাল ভিডিও বাংলাদেশ`}
                       loading={i < 4 ? 'eager' : 'lazy'}
                       decoding="async"
                       fetchpriority={i === 0 ? 'high' : 'auto'}
-                      onError={e => {
-                        // ── প্রক্সি ফেইল করলে আগে original থাম্বনেইল ট্রাই, তারপর picsum ফলব্যাক ──
-                        if (e.target.dataset.fallback !== 'original' && v.thumbnail) {
-                          e.target.dataset.fallback = 'original';
-                          e.target.src = v.thumbnail;
-                        } else {
-                          e.target.src = `https://picsum.photos/seed/${v.id}/640/360`;
-                        }
-                      }}
+                      onLoad={e => e.target.classList.add('loaded')}
+                      onError={e => handleThumbError(e, v.thumbnail, Math.round(480 * imgQ.scale), imgQ.quality)}
                     />
                     <div className="play-btn">
                       <svg viewBox="0 0 80 80" fill="none">
