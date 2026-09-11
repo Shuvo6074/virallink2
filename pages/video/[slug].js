@@ -88,48 +88,11 @@ function formatIso8601BD(date) {
 // প্রক্সি বাদ দিয়ে সরাসরি URL ব্যবহার করা হচ্ছে, কারণ wsrv.nl একসাথে
 // অনেক রিকোয়েস্ট পেলে rate-limit/timeout করে ফেলছিল (প্রথমবার কালো
 // থাম্বনেইল, রিলোডে ঠিক হওয়ার কারণ এটাই)। ──
-function thumbUrl(url, width, quality) {
+function thumbUrl(url, width) {
   if (!url) return url;
   if (url.includes('postimg.cc')) return url;
   const clean = url.replace(/^https?:\/\//, '');
-  return `https://wsrv.nl/?url=${encodeURIComponent(clean)}&w=${width}&q=${quality || 75}&output=webp`;
-}
-
-// ── অ্যাডাপটিভ কোয়ালিটি (Facebook-এর ভিডিও নেট স্লো হলে রেজোলিউশন কমিয়ে
-// দেয় সেই আইডিয়া) — নেট স্পিড দেখে শুরুতেই ঠিক সাইজ/কোয়ালিটি বেছে
-// রিকোয়েস্ট/ডেটা খরচ কমানো হয়, বারবার রিট্রাই-নির্ভর না হয়ে ──
-function getAdaptiveQuality() {
-  const conn = typeof navigator !== 'undefined'
-    ? (navigator.connection || navigator.mozConnection || navigator.webkitConnection)
-    : null;
-  if (!conn) return { scale: 1, quality: 72 };
-  if (conn.saveData) return { scale: 0.45, quality: 35 };
-  switch (conn.effectiveType) {
-    case 'slow-2g':
-    case '2g':
-      return { scale: 0.4, quality: 35 };
-    case '3g':
-      return { scale: 0.65, quality: 55 };
-    default:
-      return { scale: 1, quality: 75 };
-  }
-}
-
-// ── থাম্বনেইল লোড ফেইল হ্যান্ডলার ──
-// আগে ফেইল করলে picsum.photos-এর এলোমেলো ছবি বসানো হতো। এখন মাত্র ২ বার
-// হালকা রিট্রাই হয় (রিকোয়েস্ট/ডেটা কম খরচ হয়), তাতেও ফেইল করলে ওপরের
-// ঝাপসা (blur) প্রিভিউ ছবিটাই থেকে যায় — আসল থাম্বনেইলেরই হালকা ভার্সন।
-function handleThumbError(e, thumbnail, width, quality) {
-  const img = e.target;
-  const attempts = parseInt(img.dataset.attempts || '0', 10);
-  const maxRetries = 2;
-  if (!thumbnail || attempts >= maxRetries) return;
-  img.dataset.attempts = String(attempts + 1);
-  const delay = attempts === 0 ? 1500 : 4000;
-  const cacheBust = `cb=${Date.now()}`;
-  setTimeout(() => {
-    img.src = `${thumbUrl(thumbnail, width, quality)}&${cacheBust}`;
-  }, delay);
+  return `https://wsrv.nl/?url=${encodeURIComponent(clean)}&w=${width}&q=92&output=webp`;
 }
 
 // index.js-এর PER_PAGE-এর সাথে অবশ্যই মিলতে হবে, নাহলে pageBatch নম্বর গরমিল হবে
@@ -328,10 +291,6 @@ function ProtectedPlayer({ src }) {
 
 export default function VideoPage({ video, related, moreVideos }) {
   const router = useRouter();
-  // ── অ্যাডাপটিভ কোয়ালিটি: SSR-সেফ ডিফল্ট দিয়ে শুরু, মাউন্টের পর আসল
-  // নেট স্পিড অনুযায়ী আপডেট হয় (hydration mismatch এড়াতে) ──
-  const [imgQ, setImgQ] = useState({ scale: 1, quality: 72 });
-  useEffect(() => { setImgQ(getAdaptiveQuality()); }, []);
   const [likes, setLikes] = useState({});
   const [views, setViews] = useState({});
   const [liked, setLiked] = useState(false);
@@ -796,13 +755,9 @@ atOptions = {
                 // cross-origin iframe-এর ভিতরের ক্লিক ধরা যায় না, তাই থাম্বনেইল+▶ বসিয়ে
                 // প্রথম ক্লিকটা এখানেই ধরা হচ্ছে — এতে iframe লোড হয়
                 <div className="iframe-click-gate" onClick={() => setIframeStarted(true)}>
-                  <img className="thumb-blur" src={thumbUrl(video.thumbnail, 32, 30)} alt="" aria-hidden="true" />
                   <img
-                    className="thumb-full"
-                    src={thumbUrl(video.thumbnail, Math.round(640 * imgQ.scale), imgQ.quality)}
+                    src={thumbUrl(video.thumbnail, 800)}
                     alt={video.title}
-                    onLoad={e => e.target.classList.add('loaded')}
-                    onError={e => handleThumbError(e, video.thumbnail, Math.round(640 * imgQ.scale), imgQ.quality)}
                   />
                   <div className="play-btn-icon">▶</div>
                 </div>
@@ -859,14 +814,10 @@ atOptions = {
                 ) : initialRelated.map(v => (
                   <a key={v.id} className="related-card" href={`/video/${v.slug}`} onClick={e => handleRelatedClick(e, v.slug)}>
                     <div className="related-thumb">
-                      <img className="thumb-blur" src={thumbUrl(v.thumbnail, 20, 30)} alt="" aria-hidden="true" />
                       <img
-                        className="thumb-full"
-                        src={thumbUrl(v.thumbnail, Math.round(320 * imgQ.scale), imgQ.quality)}
+                        src={thumbUrl(v.thumbnail, 400)}
                         alt={v.title}
                         loading="lazy"
-                        onLoad={e => e.target.classList.add('loaded')}
-                        onError={e => handleThumbError(e, v.thumbnail, Math.round(320 * imgQ.scale), imgQ.quality)}
                       />
                       {v.duration && <span className="duration-badge">{v.duration}</span>}
                     </div>
@@ -893,14 +844,10 @@ atOptions = {
               ) : initialRelated.map(v => (
                 <a key={v.id} className="related-card" href={`/video/${v.slug}`} onClick={e => handleRelatedClick(e, v.slug)}>
                   <div className="related-thumb">
-                    <img className="thumb-blur" src={thumbUrl(v.thumbnail, 20, 30)} alt="" aria-hidden="true" />
                     <img
-                      className="thumb-full"
-                      src={thumbUrl(v.thumbnail, Math.round(320 * imgQ.scale), imgQ.quality)}
+                      src={thumbUrl(v.thumbnail, 400)}
                       alt={v.title}
                       loading="lazy"
-                      onLoad={e => e.target.classList.add('loaded')}
-                      onError={e => handleThumbError(e, v.thumbnail, Math.round(320 * imgQ.scale), imgQ.quality)}
                     />
                     {v.duration && <span className="duration-badge">{v.duration}</span>}
                   </div>
@@ -928,14 +875,10 @@ atOptions = {
               {extraRelated.map(v => (
                 <a key={v.id} className="related-card" href={`/video/${v.slug}`} onClick={e => handleRelatedClick(e, v.slug)}>
                   <div className="related-thumb">
-                    <img className="thumb-blur" src={thumbUrl(v.thumbnail, 20, 30)} alt="" aria-hidden="true" />
                     <img
-                      className="thumb-full"
-                      src={thumbUrl(v.thumbnail, Math.round(320 * imgQ.scale), imgQ.quality)}
+                      src={thumbUrl(v.thumbnail, 400)}
                       alt={v.title}
                       loading="lazy"
-                      onLoad={e => e.target.classList.add('loaded')}
-                      onError={e => handleThumbError(e, v.thumbnail, Math.round(320 * imgQ.scale), imgQ.quality)}
                     />
                     {v.duration && <span className="duration-badge">{v.duration}</span>}
                   </div>
