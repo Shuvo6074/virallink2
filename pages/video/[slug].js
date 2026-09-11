@@ -692,15 +692,18 @@ atOptions = {
         <meta property="og:image" content={video.thumbnail} />
         <meta property="og:site_name" content="ViralLink BD" />
         <meta name="twitter:card" content="summary_large_image" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(videoSchema) }} />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }} />
         <style>{`
           :root{--bg:#0d0d0d;--surface:#181818;--surface2:#222;--accent:#ff3d3d;--text:#f5f5f5;--muted:#888;--border:#2a2a2a;--radius:10px;}
           *{margin:0;padding:0;box-sizing:border-box;}
-          body{background:var(--bg);color:var(--text);font-family:var(--font-dm-sans),sans-serif;min-height:100vh;}
+          body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;}
           header{background:#111;border-bottom:2px solid var(--accent);padding:0 4%;position:sticky;top:0;z-index:200;}
           .header-inner{max-width:1400px;margin:0 auto;display:flex;align-items:center;height:60px;gap:1rem;}
-          .logo{font-family:var(--font-bebas),sans-serif;font-size:1.8rem;letter-spacing:2px;color:var(--text);text-decoration:none;}
+          .logo{font-family:'Bebas Neue',sans-serif;font-size:1.8rem;letter-spacing:2px;color:var(--text);text-decoration:none;}
           .logo span{color:var(--accent);}
           .main{max-width:1400px;margin:0 auto;padding:1rem 2%;}
           .back-btn{display:inline-flex;align-items:center;gap:0.5rem;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:0.4rem 1rem;cursor:pointer;font-family:inherit;font-size:0.85rem;margin-bottom:1rem;text-decoration:none;transition:all 0.2s;}
@@ -724,7 +727,7 @@ atOptions = {
           .video-tags{display:flex;flex-wrap:wrap;gap:0.5rem;margin-bottom:1rem;}
           .tag-pill{display:inline-block;padding:0.3rem 0.75rem;background:var(--surface2);color:var(--muted);font-size:0.8rem;border-radius:999px;text-decoration:none;border:1px solid rgba(255,255,255,0.1);transition:background 0.15s,color 0.15s;}
           .tag-pill:hover{background:var(--accent);color:#fff;}
-          .related-section-title{font-family:var(--font-bebas),sans-serif;font-size:1.2rem;margin-bottom:1rem;letter-spacing:1px;}
+          .related-section-title{font-family:'Bebas Neue',sans-serif;font-size:1.2rem;margin-bottom:1rem;letter-spacing:1px;}
           .related-list{display:grid;grid-template-columns:repeat(2,1fr);gap:2px;}
           @media(min-width:600px){.related-list{grid-template-columns:repeat(3,1fr);}}
           @media(min-width:1024px){.player-layout .related-sidebar .related-list{grid-template-columns:repeat(2,1fr);}}
