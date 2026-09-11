@@ -1,8 +1,9 @@
 import { Html, Head, Main, NextScript } from 'next/document';
+import { dmSans, bebasNeue } from '../lib/fonts';
 
 export default function Document() {
   return (
-    <Html lang="en">
+    <Html lang="en" className={`${dmSans.variable} ${bebasNeue.variable}`}>
       <Head>
         <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
         <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
@@ -21,9 +22,6 @@ export default function Document() {
         <link rel="canonical" href="https://virallink2.site/" />
         <meta property="og:site_name" content="ViralLink BD" />
         <meta property="og:type" content="website" />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
         <meta property="og:locale" content="bn_BD" />
         <meta name="twitter:card" content="summary_large_image" />
       </Head>
