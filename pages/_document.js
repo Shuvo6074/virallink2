@@ -19,13 +19,10 @@ export default function Document() {
         <meta name="rating" content="adult" />
         <meta name="rating" content="RTA-5042-1996-1400-1577-RTA" />
         <link rel="canonical" href="https://virallink2.site/" />
-        <meta property="og:type" content="website" />
         <meta property="og:site_name" content="ViralLink BD" />
+        <meta property="og:type" content="website" />
         <meta property="og:locale" content="bn_BD" />
         <meta name="twitter:card" content="summary_large_image" />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
       </Head>
       <body>
         <Main />
