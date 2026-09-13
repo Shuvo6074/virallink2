@@ -175,24 +175,35 @@ export default function Home({ initialVideos }) {
   const [loading, setLoading]       = useState(false);
   const [error, setError]           = useState('');
   const [views, setViews]           = useState({});
-  // ── নেট স্পিড ডিটেকশন: Network Information API দিয়ে বোঝা হচ্ছে নেট স্লো কিনা।
-  // প্রথমে (server-render + client-এর প্রথম paint) সবসময় false থাকে যাতে
+  // ── নেট স্পিড ডিটেকশন: Network Information API দিয়ে বোঝা হচ্ছে নেট স্লো/স্বাভাবিক/ফাস্ট।
+  // প্রথমে (server-render + client-এর প্রথম paint) সবসময় 'normal' থাকে যাতে
   // hydration mismatch না হয়; mount হওয়ার পর আসল অবস্থা জানা গেলে state বদলায়। ──
-  const [slowNet, setSlowNet] = useState(false);
+  const [netTier, setNetTier] = useState('normal'); // 'slow' | 'normal' | 'fast'
   useEffect(() => {
     try {
       const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
       if (!conn) return;
-      const check = () => setSlowNet(!!conn.saveData || ['slow-2g', '2g', '3g'].includes(conn.effectiveType));
+      const check = () => {
+        if (conn.saveData || ['slow-2g', '2g', '3g'].includes(conn.effectiveType)) {
+          setNetTier('slow');
+        } else if (conn.effectiveType === '4g' && (conn.downlink === undefined || conn.downlink >= 5)) {
+          setNetTier('fast');
+        } else {
+          setNetTier('normal');
+        }
+      };
       check();
       conn.addEventListener && conn.addEventListener('change', check);
       return () => conn.removeEventListener && conn.removeEventListener('change', check);
     } catch (e) {}
   }, []);
-  // স্লো নেট হলে ছোট সাইজ + কম quality — ফাইল হালকা থাকে, পুরোটা দ্রুত লোড হয়ে
-  // সাথে সাথেই ক্লিয়ার দেখায়; ফাস্ট নেটে আগের মতোই বড়/শার্প থাম্বনেইল ──
-  const adaptiveThumb = (url, width) =>
-    slowNet ? thumbUrl(url, Math.round(width * 0.55), 55) : thumbUrl(url, width);
+  // স্লো নেটে ছোট সাইজ+কম quality (দ্রুত পুরোটা লোড হয়ে সাথে সাথেই ক্লিয়ার দেখায়),
+  // ফাস্ট নেটে সাইজ+quality আরও বাড়িয়ে একদম ক্লিয়ার/শার্প থাম্বনেইল সরাসরি দেখানো হয় ──
+  const adaptiveThumb = (url, width) => {
+    if (netTier === 'slow') return thumbUrl(url, Math.round(width * 0.55), 55);
+    if (netTier === 'fast') return thumbUrl(url, Math.round(width * 1.25), 95);
+    return thumbUrl(url, width);
+  };
 
   useEffect(() => {
     // ── ভিউ কাউন্ট (নতুন সিস্টেম): এখন Google Sheets-এর বদলে Cloudflare D1
@@ -250,44 +261,6 @@ export default function Home({ initialVideos }) {
       if (s) s.remove();
     };
   }, []);
-
-  // ── highperformanceformat.com banner ads inject ──
-  useEffect(() => {
-    const container = document.getElementById('ad-bottom-container');
-    if (!container || container.dataset.loaded) return;
-    container.dataset.loaded = 'true';
-
-    function buildAdIframe(key, width, height) {
-      const iframe = document.createElement('iframe');
-      iframe.style.width = width + 'px';
-      iframe.style.height = height + 'px';
-      iframe.style.maxWidth = '100%';
-      iframe.style.border = '0';
-      iframe.style.overflow = 'hidden';
-      iframe.scrolling = 'no';
-      const html = `<!DOCTYPE html><html><head><style>html,body{margin:0;padding:0;overflow:hidden;}</style></head><body>
-<script type="text/javascript">
-atOptions = {'key':'${key}','format':'iframe','height':${height},'width':${width},'params':{}};
-</script>
-<script type="text/javascript" src="https://www.highperformanceformat.com/${key}/invoke.js"></script>
-</body></html>`;
-      iframe.srcdoc = html;
-      return iframe;
-    }
-
-    const bannerWrap = document.createElement('div');
-    bannerWrap.style.cssText = 'display:flex;justify-content:center;margin:1rem 0;';
-    bannerWrap.appendChild(buildAdIframe('5adf6dca592b0a84d1333f77bd5c167c', 728, 90));
-    container.appendChild(bannerWrap);
-
-    const gridWrap = document.createElement('div');
-    gridWrap.style.cssText = 'display:flex;flex-wrap:wrap;justify-content:center;gap:1rem;margin:1rem 0;';
-    const cell = document.createElement('div');
-    cell.style.cssText = 'width:300px;height:250px;';
-    cell.appendChild(buildAdIframe('408f7fe8d5566eee24a05d83101d2638', 300, 250));
-    gridWrap.appendChild(cell);
-    container.appendChild(gridWrap);
-  }, [loading]);
 
   async function loadVideos() {
     try {
@@ -487,8 +460,6 @@ atOptions = {'key':'${key}','format':'iframe','height':${height},'width':${width
           </div>
         )}
 
-        <div id="ad-bottom-container"></div>
-
         {/* ── SEO: হিডেন লিংক ব্লক ──
              পেজিনেশন client-side state দিয়ে চলে বলে সার্ভার-রেন্ডারড HTML-এ
              শুধু বর্তমান পেজের ভিডিও লিংকই থাকে। Googlebot যাতে হোমপেজ থেকেই
@@ -506,14 +477,14 @@ atOptions = {'key':'${key}','format':'iframe','height':${height},'width':${width
           <div className="footer-grid">
             <div>
               <h2>ViralLink BD</h2>
-              <p>বাংলাদেশের ভাইরাল ভিডিও নেটওয়ার্ক। প্রতিদিন নতুন TikTok ক্লিপ, Facebook Reels, বাংগালী মেয়েদের  xxx বিনামূল্যে দেখুন।</p>
+              <p>বাংলাদেশের ভাইরাল ভিডিও নেটওয়ার্ক। প্রতিদিন নতুন TikTok ক্লিপ, Facebook Reels, ফানি ভিডিও বিনামূল্যে দেখুন।</p>
             </div>
             <div>
               <h3>ভিডিও ক্যাটাগরি</h3>
               <ul>
                 <li>🎬 ভাইরাল ভিডিও বাংলাদেশ</li>
-                <li>📱 TikTokerder ভাইরাল ক্লিপ ২০২৬</li>
-                <li>💋 বাংলাদেশর মেয়েদের ভাইরাল হওয়া সেক্স</li>
+                <li>📱 TikTok ভাইরাল ক্লিপ ২০২৬</li>
+                <li>😂 ফানি ভিডিও বাংলাদেশ</li>
                 <li>🆕 আজকের নতুন ভাইরাল ভিডিও</li>
                 <li>📘 Facebook Reels ভাইরাল BD</li>
               </ul>
@@ -535,4 +506,4 @@ atOptions = {'key':'${key}','format':'iframe','height':${height},'width':${width
       </footer>
     </>
   );
-}
+                                              }
