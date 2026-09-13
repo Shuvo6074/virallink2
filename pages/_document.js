@@ -9,6 +9,10 @@ export default function Document() {
         <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
         <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
         <link rel="manifest" href="/site.webmanifest" />
+        {/* থাম্বনেইল প্রক্সি (wsrv.nl)-এর সাথে আগে থেকেই কানেকশন সেটআপ করে
+            রাখা হচ্ছে — প্রথম ছবির রিকোয়েস্টেই DNS/TLS হ্যান্ডশেকের সময় বাঁচবে */}
+        <link rel="preconnect" href="https://wsrv.nl" />
+        <link rel="dns-prefetch" href="https://wsrv.nl" />
 
         <meta name="google-site-verification" content="XGdM1Gf3FOdKjE7clTPbSFMyv92T7VL8y9Ox5hqCMwE" />
         <meta name="juicyads-site-verification" content="6c7e2eeb94e355ac0b4b104e07d42fbb" />
