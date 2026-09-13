@@ -24,6 +24,18 @@ function formatNum(n) {
   return n.toString();
 }
 
+// ── থাম্বনেইল ফলব্যাক (external placeholder সাইটের বদলে সাইটের নিজের ভিডিও দিয়ে) ──
+// প্রক্সি + original দুটোই ফেইল করলে, একই ক্যাটাগরির অন্য একটা ভিডিওর
+// থাম্বনেইল বসিয়ে দেওয়া হয় — কোনো বাইরের placeholder সাইট (picsum ইত্যাদি) ব্যবহার হয় না।
+function getFallbackThumb(excludeId, categories, pool) {
+  if (!pool || pool.length === 0) return null;
+  const cats = categories || [];
+  const sameCat = pool.find(x => x.id !== excludeId && x.thumbnail && x.categories?.some(c => cats.includes(c)));
+  if (sameCat) return sameCat.thumbnail;
+  const anyOther = pool.find(x => x.id !== excludeId && x.thumbnail);
+  return anyOther ? anyOther.thumbnail : null;
+}
+
 // ── Google Sheet-এ সেল "Date" টাইপ হলে gviz API সেটা প্লেইন টেক্সট না দিয়ে
 // "Date(2026,6,29)" এই অদ্ভুত ফরম্যাটে পাঠায় (মাস 0-based, তাই 6 = জুলাই)।
 // আবার তুমি যদি হাতে "29/07/2026" (DD/MM/YYYY) লেখো, সেটা প্লেইন টেক্সট
@@ -75,12 +87,12 @@ function timeAgo(dateStr) {
   return `${diffYr} year${diffYr === 1 ? '' : 's'} ago`;
 }
 
-// ── থাম্বনেইল ফিক্স: আগের কাজ-করা সহজ সিস্টেমে ফেরত — fixed quality 85,
-// adaptive scaling বাদ (নেট স্লো/ফাস্ট বিচার না করে সবসময় ক্লিয়ার) ──
-function thumbUrl(url, width) {
+// ── থাম্বনেইল: quality ৯২ থেকে কমিয়ে ৭৮ করা হলো — ফাইল সাইজ অনেক কমবে
+// (চোখে প্রায় একই দেখাবে), স্লো নেটেও পুরো ছবি দ্রুত লোড হয়ে যাবে ──
+function thumbUrl(url, width, quality = 78) {
   if (!url) return url;
   const clean = url.replace(/^https?:\/\//, '');
-  return `https://wsrv.nl/?url=${encodeURIComponent(clean)}&w=${width}&q=92&output=webp&n=-1`;
+  return `https://wsrv.nl/?url=${encodeURIComponent(clean)}&w=${width}&q=${quality}&output=webp&n=-1`;
 }
 
 // একটা ভিডিও একাধিক ক্যাটাগরিতে থাকতে পারবে — Sheets-এ কমা (,) দিয়ে
@@ -163,6 +175,24 @@ export default function Home({ initialVideos }) {
   const [loading, setLoading]       = useState(false);
   const [error, setError]           = useState('');
   const [views, setViews]           = useState({});
+  // ── নেট স্পিড ডিটেকশন: Network Information API দিয়ে বোঝা হচ্ছে নেট স্লো কিনা।
+  // প্রথমে (server-render + client-এর প্রথম paint) সবসময় false থাকে যাতে
+  // hydration mismatch না হয়; mount হওয়ার পর আসল অবস্থা জানা গেলে state বদলায়। ──
+  const [slowNet, setSlowNet] = useState(false);
+  useEffect(() => {
+    try {
+      const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+      if (!conn) return;
+      const check = () => setSlowNet(!!conn.saveData || ['slow-2g', '2g', '3g'].includes(conn.effectiveType));
+      check();
+      conn.addEventListener && conn.addEventListener('change', check);
+      return () => conn.removeEventListener && conn.removeEventListener('change', check);
+    } catch (e) {}
+  }, []);
+  // স্লো নেট হলে ছোট সাইজ + কম quality — ফাইল হালকা থাকে, পুরোটা দ্রুত লোড হয়ে
+  // সাথে সাথেই ক্লিয়ার দেখায়; ফাস্ট নেটে আগের মতোই বড়/শার্প থাম্বনেইল ──
+  const adaptiveThumb = (url, width) =>
+    slowNet ? thumbUrl(url, Math.round(width * 0.55), 55) : thumbUrl(url, width);
 
   useEffect(() => {
     // ── ভিউ কাউন্ট (নতুন সিস্টেম): এখন Google Sheets-এর বদলে Cloudflare D1
@@ -383,18 +413,23 @@ atOptions = {'key':'${key}','format':'iframe','height':${height},'width':${width
                 >
                   <div className="thumb-wrap">
                     <img
-                      src={thumbUrl(v.thumbnail, 640)}
+                      src={adaptiveThumb(v.thumbnail, 640)}
                       alt={`${v.title} - ভাইরাল ভিডিও বাংলাদেশ`}
                       loading={i < 4 ? 'eager' : 'lazy'}
                       decoding="async"
                       fetchpriority={i === 0 ? 'high' : 'auto'}
                       onError={e => {
-                        // ── প্রক্সি ফেইল করলে আগে original থাম্বনেইল ট্রাই, তারপর picsum ফলব্যাক ──
+                        // ── প্রক্সি ফেইল করলে আগে original থাম্বনেইল ট্রাই, তারপর একই
+                        // ক্যাটাগরির অন্য একটা ভিডিওর থাম্বনেইল (সাইটের নিজের ডেটা থেকে) ──
                         if (e.target.dataset.fallback !== 'original' && v.thumbnail) {
                           e.target.dataset.fallback = 'original';
                           e.target.src = v.thumbnail;
+                        } else if (e.target.dataset.fallback !== 'category') {
+                          e.target.dataset.fallback = 'category';
+                          const fb = getFallbackThumb(v.id, v.categories, allVideos);
+                          if (fb) e.target.src = fb; else e.target.style.visibility = 'hidden';
                         } else {
-                          e.target.src = `https://picsum.photos/seed/${v.id}/640/360`;
+                          e.target.style.visibility = 'hidden';
                         }
                       }}
                     />
@@ -471,14 +506,14 @@ atOptions = {'key':'${key}','format':'iframe','height':${height},'width':${width
           <div className="footer-grid">
             <div>
               <h2>ViralLink BD</h2>
-              <p>বাংলাদেশের ভাইরাল ভিডিও নেটওয়ার্ক। প্রতিদিন নতুন TikTok ক্লিপ, Facebook Reels, ফানি ভিডিও বিনামূল্যে দেখুন।</p>
+              <p>বাংলাদেশের ভাইরাল ভিডিও নেটওয়ার্ক। প্রতিদিন নতুন TikTok ক্লিপ, Facebook Reels, বাংগালী মেয়েদের  xxx বিনামূল্যে দেখুন।</p>
             </div>
             <div>
               <h3>ভিডিও ক্যাটাগরি</h3>
               <ul>
                 <li>🎬 ভাইরাল ভিডিও বাংলাদেশ</li>
-                <li>📱 TikTok ভাইরাল ক্লিপ ২০২৬</li>
-                <li>😂 ফানি ভিডিও বাংলাদেশ</li>
+                <li>📱 TikTokerder ভাইরাল ক্লিপ ২০২৬</li>
+                <li>💋 বাংলাদেশর মেয়েদের ভাইরাল হওয়া সেক্স</li>
                 <li>🆕 আজকের নতুন ভাইরাল ভিডিও</li>
                 <li>📘 Facebook Reels ভাইরাল BD</li>
               </ul>
@@ -500,4 +535,4 @@ atOptions = {'key':'${key}','format':'iframe','height':${height},'width':${width
       </footer>
     </>
   );
-    }
+}
