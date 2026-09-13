@@ -304,22 +304,34 @@ function ProtectedPlayer({ src }) {
 export default function VideoPage({ video, related, moreVideos }) {
   const router = useRouter();
   const [likes, setLikes] = useState({});
-  // ── নেট স্পিড ডিটেকশন: প্রথমে false (SSR/প্রথম paint-এ hydration mismatch
-  // এড়াতে), mount-এর পর আসল অবস্থা অনুযায়ী state বদলায় ──
-  const [slowNet, setSlowNet] = useState(false);
+  // ── নেট স্পিড ডিটেকশন: প্রথমে 'normal' (SSR/প্রথম paint-এ hydration mismatch
+  // এড়াতে), mount-এর পর আসল অবস্থা (slow/normal/fast) অনুযায়ী state বদলায় ──
+  const [netTier, setNetTier] = useState('normal'); // 'slow' | 'normal' | 'fast'
   useEffect(() => {
     try {
       const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
       if (!conn) return;
-      const check = () => setSlowNet(!!conn.saveData || ['slow-2g', '2g', '3g'].includes(conn.effectiveType));
+      const check = () => {
+        if (conn.saveData || ['slow-2g', '2g', '3g'].includes(conn.effectiveType)) {
+          setNetTier('slow');
+        } else if (conn.effectiveType === '4g' && (conn.downlink === undefined || conn.downlink >= 5)) {
+          setNetTier('fast');
+        } else {
+          setNetTier('normal');
+        }
+      };
       check();
       conn.addEventListener && conn.addEventListener('change', check);
       return () => conn.removeEventListener && conn.removeEventListener('change', check);
     } catch (e) {}
   }, []);
-  // স্লো নেটে ছোট সাইজ + কম quality — দ্রুত পুরোটা লোড হয়ে সাথে সাথেই ক্লিয়ার দেখায় ──
-  const adaptiveThumb = (url, width) =>
-    slowNet ? thumbUrl(url, Math.round(width * 0.55), 55) : thumbUrl(url, width);
+  // স্লো নেটে ছোট সাইজ+কম quality, ফাস্ট নেটে সাইজ+quality বাড়িয়ে একদম
+  // ক্লিয়ার/শার্প থাম্বনেইল সরাসরি দেখানো হয় ──
+  const adaptiveThumb = (url, width) => {
+    if (netTier === 'slow') return thumbUrl(url, Math.round(width * 0.55), 55);
+    if (netTier === 'fast') return thumbUrl(url, Math.round(width * 1.25), 95);
+    return thumbUrl(url, width);
+  };
   const [views, setViews] = useState({});
   const [liked, setLiked] = useState(false);
   const [showOverlay, setShowOverlay] = useState(true);
@@ -722,6 +734,8 @@ atOptions = {
           .related-card:hover{box-shadow:0 4px 20px rgba(255,61,61,0.2);}
           .related-thumb{position:relative;width:100%;padding-top:56.25%;background:#000;overflow:hidden;}
           .related-thumb img{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;transition:transform 0.3s;}
+          .video-seo-footer{padding:1.5rem 0 0.5rem;font-size:0.85rem;color:var(--muted);line-height:1.7;border-top:1px solid var(--border);margin-top:1.5rem;}
+          .video-seo-footer p{margin:0;}
           .thumb-blur{filter:blur(14px);transform:scale(1.15);}
           .thumb-full{opacity:0;transition:opacity 0.35s ease;}
           .thumb-full.loaded{opacity:1;}
@@ -985,7 +999,13 @@ atOptions = {
           <div style={{display:'flex',justifyContent:'center',margin:'1rem 0'}} id="native-banner-related-bottom"></div>
         )}
 
+        {/* ── SEO: পেজের একদম নিচে ভাইরাল ভিডিও সম্পর্কিত টেক্সট — সার্চ
+             ইঞ্জিনকে পেজের বিষয়বস্তু বুঝতে সাহায্য করে (হোমপেজের ফুটারের মতোই) ── */}
+        <div className="video-seo-footer">
+          <p>ViralLink BD-তে প্রতিদিন নতুন বাংলাদেশি ভাইরাল ভিডিও, ট্রেন্ডিং TikTok ক্লিপ, Facebook Reels আর ফানি ভিডিও একদম ফ্রিতে দেখুন। এই ভিডিওটার মতো আরও হাজারো ভাইরাল ভিডিও বাংলাদেশ ২০২৬-এর সবচেয়ে বড় সংগ্রহ এখানেই পাবেন — প্রতিদিন আপডেট হওয়া নতুন কনটেন্ট নিয়ে।</p>
+        </div>
+
       </div>
     </>
   );
-}
+        }
