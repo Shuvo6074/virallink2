@@ -477,23 +477,23 @@ export default function Home({ initialVideos }) {
           <div className="footer-grid">
             <div>
               <h2>ViralLink BD</h2>
-              <p>বাংলাদেশের ভাইরাল ভিডিও নেটওয়ার্ক। প্রতিদিন নতুন TikTok ক্লিপ, Facebook Reels, ফানি ভিডিও বিনামূল্যে দেখুন।</p>
+              <p>বাংলাদেশের ভাইরাল ভিডিও নেটওয়ার্ক। প্রতিদিন নতুন TikTok ক্লিপ, Facebook Reels, বাংগালী মেয়েের সব ভিডিও বিনামূল্যে দেখুন।</p>
             </div>
             <div>
               <h3>ভিডিও ক্যাটাগরি</h3>
               <ul>
                 <li>🎬 ভাইরাল ভিডিও বাংলাদেশ</li>
                 <li>📱 TikTok ভাইরাল ক্লিপ ২০২৬</li>
-                <li>😂 ফানি ভিডিও বাংলাদেশ</li>
+                <li>💋বাংলাদেশর মেয়েদের ভাইরাল হওয়া ভিডিও লিংক </li>
                 <li>🆕 আজকের নতুন ভাইরাল ভিডিও</li>
-                <li>📘 Facebook Reels ভাইরাল BD</li>
+                <li>📘 বাংগালী মেয়েদের সকল ভাইরাল ভিডিও একসাথে</li>
               </ul>
             </div>
             <div>
               <h3>জনপ্রিয় সার্চ</h3>
               <ul>
                 <li><a href="/search?q=tiktok+viral">🔥 TikTok Viral BD 2026</a></li>
-                <li><a href="/search?q=funny+video">😂 Funny Video Bangladesh</a></li>
+                <li><a href="/search?q=funny+video">💋 Bangali maya der x Bangladesh</a></li>
                 <li><a href="/search?q=facebook+reels">📘 Facebook Reels Viral BD</a></li>
                 <li><a href="/search?q=new+viral">🆕 New Viral Video Today BD</a></li>
               </ul>
@@ -506,4 +506,4 @@ export default function Home({ initialVideos }) {
       </footer>
     </>
   );
-                                              }
+      }
