@@ -21,6 +21,18 @@ function formatNum(n) {
   return n.toString();
 }
 
+// ── থাম্বনেইল ফলব্যাক (external placeholder সাইটের বদলে সাইটের নিজের ভিডিও দিয়ে) ──
+// প্রক্সি + original দুটোই ফেইল করলে, একই ক্যাটাগরির অন্য একটা ভিডিওর
+// থাম্বনেইল বসিয়ে দেওয়া হয় — কোনো বাইরের placeholder সাইট ব্যবহার হয় না।
+function getFallbackThumb(excludeId, categories, pool) {
+  if (!pool || pool.length === 0) return null;
+  const cats = categories || [];
+  const sameCat = pool.find(x => x.id !== excludeId && x.thumbnail && x.categories?.some(c => cats.includes(c)));
+  if (sameCat) return sameCat.thumbnail;
+  const anyOther = pool.find(x => x.id !== excludeId && x.thumbnail);
+  return anyOther ? anyOther.thumbnail : null;
+}
+
 // ── Google Sheet-এ সেল "Date" টাইপ হলে gviz API সেটা প্লেইন টেক্সট না দিয়ে
 // "Date(2026,6,29)" এই অদ্ভুত ফরম্যাটে পাঠায় (মাস 0-based, তাই 6 = জুলাই)।
 // আবার তুমি যদি হাতে "29/07/2026" (DD/MM/YYYY) লেখো, সেটা প্লেইন টেক্সট
@@ -88,11 +100,11 @@ function formatIso8601BD(date) {
 // প্রক্সি বাদ দিয়ে সরাসরি URL ব্যবহার করা হচ্ছে, কারণ wsrv.nl একসাথে
 // অনেক রিকোয়েস্ট পেলে rate-limit/timeout করে ফেলছিল (প্রথমবার কালো
 // থাম্বনেইল, রিলোডে ঠিক হওয়ার কারণ এটাই)। ──
-function thumbUrl(url, width) {
+function thumbUrl(url, width, quality = 78) {
   if (!url) return url;
   if (url.includes('postimg.cc')) return url;
   const clean = url.replace(/^https?:\/\//, '');
-  return `https://wsrv.nl/?url=${encodeURIComponent(clean)}&w=${width}&q=92&output=webp`;
+  return `https://wsrv.nl/?url=${encodeURIComponent(clean)}&w=${width}&q=${quality}&output=webp`;
 }
 
 // index.js-এর PER_PAGE-এর সাথে অবশ্যই মিলতে হবে, নাহলে pageBatch নম্বর গরমিল হবে
@@ -292,6 +304,22 @@ function ProtectedPlayer({ src }) {
 export default function VideoPage({ video, related, moreVideos }) {
   const router = useRouter();
   const [likes, setLikes] = useState({});
+  // ── নেট স্পিড ডিটেকশন: প্রথমে false (SSR/প্রথম paint-এ hydration mismatch
+  // এড়াতে), mount-এর পর আসল অবস্থা অনুযায়ী state বদলায় ──
+  const [slowNet, setSlowNet] = useState(false);
+  useEffect(() => {
+    try {
+      const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+      if (!conn) return;
+      const check = () => setSlowNet(!!conn.saveData || ['slow-2g', '2g', '3g'].includes(conn.effectiveType));
+      check();
+      conn.addEventListener && conn.addEventListener('change', check);
+      return () => conn.removeEventListener && conn.removeEventListener('change', check);
+    } catch (e) {}
+  }, []);
+  // স্লো নেটে ছোট সাইজ + কম quality — দ্রুত পুরোটা লোড হয়ে সাথে সাথেই ক্লিয়ার দেখায় ──
+  const adaptiveThumb = (url, width) =>
+    slowNet ? thumbUrl(url, Math.round(width * 0.55), 55) : thumbUrl(url, width);
   const [views, setViews] = useState({});
   const [liked, setLiked] = useState(false);
   const [showOverlay, setShowOverlay] = useState(true);
@@ -756,8 +784,20 @@ atOptions = {
                 // প্রথম ক্লিকটা এখানেই ধরা হচ্ছে — এতে iframe লোড হয়
                 <div className="iframe-click-gate" onClick={() => setIframeStarted(true)}>
                   <img
-                    src={thumbUrl(video.thumbnail, 800)}
+                    src={adaptiveThumb(video.thumbnail, 800)}
                     alt={video.title}
+                    onError={e => {
+                      if (e.target.dataset.fallback !== 'original' && video.thumbnail) {
+                        e.target.dataset.fallback = 'original';
+                        e.target.src = video.thumbnail;
+                      } else if (e.target.dataset.fallback !== 'category') {
+                        e.target.dataset.fallback = 'category';
+                        const fb = getFallbackThumb(video.id, video.categories, related);
+                        if (fb) e.target.src = fb; else e.target.style.visibility = 'hidden';
+                      } else {
+                        e.target.style.visibility = 'hidden';
+                      }
+                    }}
                   />
                   <div className="play-btn-icon">▶</div>
                 </div>
@@ -815,9 +855,21 @@ atOptions = {
                   <a key={v.id} className="related-card" href={`/video/${v.slug}`} onClick={e => handleRelatedClick(e, v.slug)}>
                     <div className="related-thumb">
                       <img
-                        src={thumbUrl(v.thumbnail, 400)}
+                        src={adaptiveThumb(v.thumbnail, 400)}
                         alt={v.title}
                         loading="lazy"
+                        onError={e => {
+                          if (e.target.dataset.fallback !== 'original' && v.thumbnail) {
+                            e.target.dataset.fallback = 'original';
+                            e.target.src = v.thumbnail;
+                          } else if (e.target.dataset.fallback !== 'category') {
+                            e.target.dataset.fallback = 'category';
+                            const fb = getFallbackThumb(v.id, v.categories, related);
+                            if (fb) e.target.src = fb; else e.target.style.visibility = 'hidden';
+                          } else {
+                            e.target.style.visibility = 'hidden';
+                          }
+                        }}
                       />
                       {v.duration && <span className="duration-badge">{v.duration}</span>}
                     </div>
@@ -845,9 +897,21 @@ atOptions = {
                 <a key={v.id} className="related-card" href={`/video/${v.slug}`} onClick={e => handleRelatedClick(e, v.slug)}>
                   <div className="related-thumb">
                     <img
-                      src={thumbUrl(v.thumbnail, 400)}
+                      src={adaptiveThumb(v.thumbnail, 400)}
                       alt={v.title}
                       loading="lazy"
+                      onError={e => {
+                        if (e.target.dataset.fallback !== 'original' && v.thumbnail) {
+                          e.target.dataset.fallback = 'original';
+                          e.target.src = v.thumbnail;
+                        } else if (e.target.dataset.fallback !== 'category') {
+                          e.target.dataset.fallback = 'category';
+                          const fb = getFallbackThumb(v.id, v.categories, related);
+                          if (fb) e.target.src = fb; else e.target.style.visibility = 'hidden';
+                        } else {
+                          e.target.style.visibility = 'hidden';
+                        }
+                      }}
                     />
                     {v.duration && <span className="duration-badge">{v.duration}</span>}
                   </div>
@@ -876,9 +940,21 @@ atOptions = {
                 <a key={v.id} className="related-card" href={`/video/${v.slug}`} onClick={e => handleRelatedClick(e, v.slug)}>
                   <div className="related-thumb">
                     <img
-                      src={thumbUrl(v.thumbnail, 400)}
+                      src={adaptiveThumb(v.thumbnail, 400)}
                       alt={v.title}
                       loading="lazy"
+                      onError={e => {
+                        if (e.target.dataset.fallback !== 'original' && v.thumbnail) {
+                          e.target.dataset.fallback = 'original';
+                          e.target.src = v.thumbnail;
+                        } else if (e.target.dataset.fallback !== 'category') {
+                          e.target.dataset.fallback = 'category';
+                          const fb = getFallbackThumb(v.id, v.categories, related);
+                          if (fb) e.target.src = fb; else e.target.style.visibility = 'hidden';
+                        } else {
+                          e.target.style.visibility = 'hidden';
+                        }
+                      }}
                     />
                     {v.duration && <span className="duration-badge">{v.duration}</span>}
                   </div>
