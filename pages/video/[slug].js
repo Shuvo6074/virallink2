@@ -126,6 +126,24 @@ function parseTags(str) {
   return (str || '').split(',').map(s => s.trim()).filter(Boolean);
 }
 
+// ── নতুন: seeded shuffle — related videos-এর অর্ডার cache window (১৫ মিনিট)
+// অনুযায়ী ঘুরিয়ে দেয়, যাতে একই ভিডিওর related লিস্ট বারবার আসা ইউজারের
+// কাছে প্রতিবারই এক না লাগে। seed-এ video.id মেশানো থাকায় প্রতিটা ভিডিও
+// পাতার শাফল প্যাটার্ন আলাদা হয় (সব পাতা একসাথে একইভাবে ঘোরে না)। একই
+// SSR cache window-এর মধ্যে সবার জন্য অর্ডার একই থাকে, তাই hydration
+// mismatch হয় না (এই কারণে Math.random() ব্যবহার করা হয়নি)। ──
+function seededShuffle(arr, seed) {
+  const a = [...arr];
+  let s = seed % 2147483647;
+  if (s <= 0) s += 2147483646;
+  for (let i = a.length - 1; i > 0; i--) {
+    s = (s * 16807) % 2147483647;
+    const j = Math.floor((s / 2147483647) * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
 // একই টাইটেল বারবার এলে slug-এর শেষে -2, -3 ... যোগ হবে, যাতে প্রতিটা
 // ভিডিওর নিজস্ব আলাদা URL থাকে। index.js আর sitemap.js-এও এই একই
 // লজিক ব্যবহার করা হয়েছে, তাই সব জায়গায় slug মিলে যাবে।
@@ -212,21 +230,43 @@ export async function getServerSideProps({ params, res: httpRes }) {
     const usedIds = new Set([video.id]);
     const relatedVideos = [];
 
+    // প্রতিটা video object-এ 'source' ট্যাগ বসানো হচ্ছে — কার্ডে ছোট ব্যাজ
+    // দেখানোর জন্য (কোন ভিডিও কেন related, সেটা বোঝাতে)
     video.categories.forEach(cat => {
       const matches = allVideos.filter(v => !usedIds.has(v.id) && v.categories.includes(cat)).slice(0, 5);
-      matches.forEach(v => { relatedVideos.push(v); usedIds.add(v.id); });
+      matches.forEach(v => { relatedVideos.push({ ...v, source: 'category' }); usedIds.add(v.id); });
     });
+
+    // ── আপডেট: এই ভিডিওটা হোমপেজের যে পাতা/ব্যাচ থেকে এসেছে, সেই একই
+    // ব্যাচের আরও ভিডিও — আগে মাত্র ৩টা নেওয়া হতো, এখন ৮টা করা হলো, যাতে
+    // ইউজার "একই পাতার আরও ভিডিও" এর continuity অনুভব করে ──
+    const batchMatches = allVideos.filter(v => !usedIds.has(v.id) && v.pageBatch === video.pageBatch).slice(0, 8);
+    batchMatches.forEach(v => { relatedVideos.push({ ...v, source: 'batch' }); usedIds.add(v.id); });
 
     const allCategories = [...new Set(allVideos.flatMap(v => v.categories))];
     const otherCategories = allCategories.filter(cat => !video.categories.includes(cat));
     otherCategories.forEach(cat => {
       const matches = allVideos.filter(v => !usedIds.has(v.id) && v.categories.includes(cat)).slice(0, 5);
-      matches.forEach(v => { relatedVideos.push(v); usedIds.add(v.id); });
+      matches.forEach(v => { relatedVideos.push({ ...v, source: 'other' }); usedIds.add(v.id); });
     });
 
-    const batchRelated = allVideos.filter(v => !usedIds.has(v.id) && v.pageBatch === video.pageBatch).slice(0, 3);
-    batchRelated.forEach(v => usedIds.add(v.id));
-    const related = [...relatedVideos, ...batchRelated].slice(0, 40);
+    // ── নতুন: সাইটের একদম নতুন কয়েকটা ভিডিও (allVideos আগে থেকেই reverse
+    // করা, তাই শুরুর দিকেরগুলোই লেটেস্ট) — "🆕 নতুন" ব্যাজ নিয়ে যোগ হয় ──
+    const latestVideos = allVideos.filter(v => !usedIds.has(v.id)).slice(0, 4);
+    latestVideos.forEach(v => { relatedVideos.push({ ...v, source: 'latest' }); usedIds.add(v.id); });
+
+    // ── নতুন: প্রতি ১৫ মিনিটের cache window অনুযায়ী related-এর অর্ডার শাফল
+    // হয় — একই ভিডিও বারবার টপে থাকে না, রিপিট ভিজিটর ভিন্ন অর্ডার দেখে ──
+    const timeBucket = Math.floor(Date.now() / (15 * 60 * 1000));
+    const related = seededShuffle(relatedVideos, video.id * 7919 + timeBucket).slice(0, 40);
+
+    // ── নতুন: "সর্বশেষ ভিডিও" আলাদা ফুল-উইথ সেকশন — উপরের related গ্রিডে
+    // (প্রথম ১২টা, initialRelated) যেগুলো এমনিতেই দেখানো হচ্ছে সেগুলো বাদ
+    // দিয়ে, যাতে একই স্ক্রিনে একই ভিডিও দুইবার না দেখায় ──
+    const visibleRelatedIds = new Set(related.slice(0, 12).map(v => v.id));
+    const latestSection = allVideos
+      .filter(v => v.id !== video.id && !visibleRelatedIds.has(v.id))
+      .slice(0, 10);
 
     // ── Infinite scroll pool (নতুন): related-এর ৪০টা শেষ হয়ে গেলেও যাতে
     // স্ক্রল করলে আরও ভিডিও আসতে থাকে, তাই সাইটের বাকি সব ভিডিও (যেগুলো
@@ -238,7 +278,7 @@ export async function getServerSideProps({ params, res: httpRes }) {
     const leanify = v => ({ id: v.id, title: v.title, thumbnail: v.thumbnail, categories: v.categories, date: v.date, slug: v.slug, duration: v.duration });
     const moreVideos = allVideos.filter(v => !usedAfterRelated.has(v.id)).map(leanify);
 
-    return { props: { video, related, moreVideos } };
+    return { props: { video, related, moreVideos, latestSection } };
   } catch(e) {
     return { notFound: true };
   }
@@ -301,7 +341,7 @@ function ProtectedPlayer({ src }) {
   );
 }
 
-export default function VideoPage({ video, related, moreVideos }) {
+export default function VideoPage({ video, related, moreVideos, latestSection }) {
   const router = useRouter();
   const [likes, setLikes] = useState({});
   // ── নেট স্পিড ডিটেকশন: প্রথমে 'normal' (SSR/প্রথম paint-এ hydration mismatch
@@ -372,6 +412,23 @@ export default function VideoPage({ video, related, moreVideos }) {
     setShowAdOverlay2(false);
   }
 
+  // ── নতুন: related videos-এর ক্লায়েন্ট-সাইড শাফল — সার্ভারের ১৫ মিনিটের
+  // cache window থেকে সম্পূর্ণ আলাদা একটা সিস্টেম। সার্ভার থেকে যে অর্ডারে
+  // related আসে (SSR/SEO-এর জন্য সেটাই HTML source-এ থাকে, hydration
+  // mismatch এড়াতে প্রথম রেন্ডারে সেটাই দেখানো হয়), তারপর পেজ লোড হওয়ার
+  // পরপরই browser-এ Math.random() দিয়ে আবার এলোমেলো করে দেওয়া হচ্ছে। এতে
+  // প্রতিটা ভিজিট/রিফ্রেশে (১৫ মিনিট অপেক্ষা না করেই) ইউজার ভিন্ন অর্ডার
+  // দেখবে — SEO বা cache-এ কোনো প্রভাব পড়বে না ──
+  const [displayRelated, setDisplayRelated] = useState(related);
+  useEffect(() => {
+    const a = [...related];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    setDisplayRelated(a);
+  }, [video.id]);
+
   // ── Infinite scroll (নতুন): শুরুতে related videos-এর প্রথম ১২টাই দেখানো হয়
   // (related-mobile / desktop sidebar-এ)। ব্যানার অ্যাডের নিচে ইউজার স্ক্রল
   // করলে ধীরে ধীরে (৮টা করে ব্যাচে) বাকি ভিডিওগুলো লোড হবে — একসাথে সব
@@ -381,11 +438,11 @@ export default function VideoPage({ video, related, moreVideos }) {
   const [extraCount, setExtraCount] = useState(0);
   const loadMoreRef = useRef(null);
 
-  const initialRelated = related.slice(0, INITIAL_RELATED_SHOW);
+  const initialRelated = displayRelated.slice(0, INITIAL_RELATED_SHOW);
   // ── আপডেট: infiniteScrollPool এখন শুধু related-এর বাকি অংশ (১২-৪০), মোট
   // সর্বোচ্চ ৪০টা ভিডিও দেখাবে (moreVideos আর যোগ হচ্ছে না) — ৪০ শেষ হলে
   // স্ক্রল থেমে যাবে এবং নিচে ব্যানার এড দেখাবে। ──
-  const infiniteScrollPool = related.slice(INITIAL_RELATED_SHOW);
+  const infiniteScrollPool = displayRelated.slice(INITIAL_RELATED_SHOW);
   const extraRelated = infiniteScrollPool.slice(0, extraCount);
   const hasMoreToLoad = extraCount < infiniteScrollPool.length;
 
@@ -737,6 +794,9 @@ atOptions = {
           .thumb-full{opacity:0;transition:opacity 0.35s ease;}
           .thumb-full.loaded{opacity:1;}
           .duration-badge{position:absolute;bottom:4px;right:4px;background:rgba(0,0,0,0.45);color:#fff;font-size:0.62rem;font-weight:600;padding:1px 5px;border-radius:3px;line-height:1.3;z-index:2;}
+          .source-badge{position:absolute;top:4px;left:4px;font-size:0.6rem;font-weight:700;padding:1px 6px;border-radius:3px;line-height:1.4;z-index:2;color:#fff;}
+          .latest-badge{background:rgba(220,38,38,0.85);}
+          .batch-badge{background:rgba(0,0,0,0.55);}
           .related-card:hover .related-thumb img{transform:scale(1.03);}
           .related-info{padding:0.5rem 0.6rem;}
           .related-title-text{font-size:0.78rem;font-weight:600;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;line-height:1.3;margin-bottom:0.25rem;}
@@ -882,6 +942,8 @@ atOptions = {
                           }
                         }}
                       />
+                      {v.source === 'latest' && <span className="source-badge latest-badge">🆕 নতুন</span>}
+                      {v.source === 'batch' && <span className="source-badge batch-badge">📁 এই পাতা থেকে</span>}
                       {v.duration && <span className="duration-badge">{v.duration}</span>}
                     </div>
                     <div className="related-info">
@@ -924,6 +986,8 @@ atOptions = {
                         }
                       }}
                     />
+                    {v.source === 'latest' && <span className="source-badge latest-badge">🆕 নতুন</span>}
+                    {v.source === 'batch' && <span className="source-badge batch-badge">📁 এই পাতা থেকে</span>}
                     {v.duration && <span className="duration-badge">{v.duration}</span>}
                   </div>
                   <div className="related-info">
@@ -939,6 +1003,51 @@ atOptions = {
             </div>
           </div>
         </div>
+
+        {/* ── নতুন: "সর্বশেষ ভিডিও" — আলাদা ফুল-উইথ লিস্ট, উপরের related
+             গ্রিডের মতো ক্যাটাগরি-ভিত্তিক না, শুধু recency-ভিত্তিক। এই
+             লিস্টের ঠিক নিচেই নেটিভ অ্যাডটা বসানো হলো, যাতে ইউজার লিস্ট
+             স্ক্রল করে শেষ করার পর স্বাভাবিকভাবেই ওইখানে চোখ পড়ে ── */}
+        {latestSection.length > 0 && (
+          <>
+            <div className="related-section-title">সর্বশেষ ভিডিও</div>
+            <div className="related-list">
+              {latestSection.map(v => (
+                <a key={v.id} className="related-card" href={`/video/${v.slug}`} onClick={e => handleRelatedClick(e, v.slug)}>
+                  <div className="related-thumb">
+                    <img
+                      src={adaptiveThumb(v.thumbnail, 400)}
+                      alt={v.title}
+                      loading="lazy"
+                      onError={e => {
+                        if (e.target.dataset.fallback !== 'original' && v.thumbnail) {
+                          e.target.dataset.fallback = 'original';
+                          e.target.src = v.thumbnail;
+                        } else if (e.target.dataset.fallback !== 'category') {
+                          e.target.dataset.fallback = 'category';
+                          const fb = getFallbackThumb(v.id, v.categories, related);
+                          if (fb) e.target.src = fb; else e.target.style.visibility = 'hidden';
+                        } else {
+                          e.target.style.visibility = 'hidden';
+                        }
+                      }}
+                    />
+                    <span className="source-badge latest-badge">🆕 নতুন</span>
+                    {v.duration && <span className="duration-badge">{v.duration}</span>}
+                  </div>
+                  <div className="related-info">
+                    <div className="related-title-text">{v.title}</div>
+                    <div className="related-meta">
+                    <span>{v.categories.join(', ')}</span>
+                    <span> · 👁 {formatNum(views[v.slug] || 0)}</span>
+                    {v.date && <span> · {timeAgo(v.date) || v.date}</span>}
+                  </div>
+                  </div>
+                </a>
+              ))}
+            </div>
+          </>
+        )}
 
         <div id="container-e474628fdcec06f52100e0b84b3fa759"></div>
 
@@ -967,6 +1076,8 @@ atOptions = {
                         }
                       }}
                     />
+                    {v.source === 'latest' && <span className="source-badge latest-badge">🆕 নতুন</span>}
+                    {v.source === 'batch' && <span className="source-badge batch-badge">📁 এই পাতা থেকে</span>}
                     {v.duration && <span className="duration-badge">{v.duration}</span>}
                   </div>
                   <div className="related-info">
