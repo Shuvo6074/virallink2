@@ -333,7 +333,9 @@ function ProtectedPlayer({ src }) {
       autoPlay
       playsInline
       preload="metadata"
-      controlsList="nodownload"
+      controlsList="nodownload noremoteplayback noplaybackrate"
+      disablePictureInPicture
+      onContextMenu={e => e.preventDefault()}
       style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', background: '#000', objectFit: 'contain' }}
     >
       {!isHls && <source src={src} />}
@@ -412,18 +414,23 @@ export default function VideoPage({ video, related, moreVideos, latestSection })
     setShowAdOverlay2(false);
   }
 
-  // ── নতুন: related videos-এর ক্লায়েন্ট-সাইড শাফল — সার্ভারের ১৫ মিনিটের
-  // cache window থেকে সম্পূর্ণ আলাদা একটা সিস্টেম। সার্ভার থেকে যে অর্ডারে
-  // related আসে (SSR/SEO-এর জন্য সেটাই HTML source-এ থাকে, hydration
-  // mismatch এড়াতে প্রথম রেন্ডারে সেটাই দেখানো হয়), তারপর পেজ লোড হওয়ার
-  // পরপরই browser-এ Math.random() দিয়ে আবার এলোমেলো করে দেওয়া হচ্ছে। এতে
-  // প্রতিটা ভিজিট/রিফ্রেশে (১৫ মিনিট অপেক্ষা না করেই) ইউজার ভিন্ন অর্ডার
-  // দেখবে — SEO বা cache-এ কোনো প্রভাব পড়বে না ──
+  // ── ফিক্স: related videos-এর ক্লায়েন্ট-সাইড শাফল — সার্ভারের ১৫ মিনিটের
+  // cache window থেকে আলাদা, কিন্তু আগে Math.random() ব্যবহার করা হতো বলে
+  // প্রতিবার (page mount) ভিন্ন অর্ডার আসতো — সমস্যা হলো, প্লে বাটনে ক্লিক
+  // করলে এই একই ভিডিও পেজটাই (?autoplay=1 সহ) আরেকটা নতুন ট্যাবে খোলে
+  // (দ্বিতীয় লোড), আর Math.random() থাকায় সেই দ্বিতীয় লোডে সম্পূর্ণ আলাদা
+  // থাম্বনেইল ছবি লোড হতো — মোবাইল ডেটার অপচয়। এখন video.id দিয়ে seed করা
+  // deterministic শাফল ব্যবহার করা হচ্ছে: একই ভিডিওর জন্য সবসময় হুবহু একই
+  // অর্ডার আসবে (যতবারই লোড/রিলোড/নতুন ট্যাব হোক), অর্ডার তখনই বদলাবে যখন
+  // ইউজার সত্যিকারের অন্য একটা ভিডিওতে (আলাদা video.id) যাবে ──
   const [displayRelated, setDisplayRelated] = useState(related);
   useEffect(() => {
     const a = [...related];
+    let s = (video.id * 2654435761) % 2147483647;
+    if (s <= 0) s += 2147483646;
     for (let i = a.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
+      s = (s * 16807) % 2147483647;
+      const j = Math.floor((s / 2147483647) * (i + 1));
       [a[i], a[j]] = [a[j], a[i]];
     }
     setDisplayRelated(a);
@@ -504,19 +511,16 @@ export default function VideoPage({ video, related, moreVideos, latestSection })
     }
   }
 
-  // ── ফিক্স: ডাউনলোডের ক্ষেত্রে related/back-এর মতো সোজাসুজি tab swap করা
-  // যায় না — current পেজটাই থাকতে হবে (নাহলে download মাঝপথে বাতিল হয়ে
-  // যেতে পারে)। তাই এখানে উল্টো ট্রিক: আগে খালি ট্যাব রিজার্ভ করে সেখানে
-  // SmartLink পাঠানো হচ্ছে (এটা সাময়িকভাবে ফোকাস পাবে), তারপর সাথে সাথেই
-  // window.focus() কল করে current ট্যাবে ফোকাস ফিরিয়ে আনা হচ্ছে — ফলে
-  // ইউজার অ্যাড ট্যাবটা চোখেই দেখে না, সে ভিডিও পেজেই থেকে যায় আর ডাউনলোডও
-  // বাধাহীনভাবে চলতে থাকে। popup ব্লক হলে শুধু ডাউনলোডই হবে, অ্যাড স্কিপ। ──
+  // ── আপডেট: ডাউনলোডে ক্লিক করলে এখন অ্যাডটা সরাসরি, খোলাখুলিভাবে ইউজারের
+  // সামনে নতুন ট্যাবে ওপেন হবে (আগের মতো window.focus() দিয়ে লুকানো হচ্ছে
+  // না) — ইউজার স্পষ্ট দেখবে অ্যাড খুলেছে। একই সাথে current (background)
+  // ট্যাবে ডাউনলোডও স্বয়ংক্রিয়ভাবে শুরু হয়ে যাবে, আলাদা কোনো ক্লিক লাগবে
+  // না। popup ব্লক হলে শুধু ডাউনলোডই হবে, অ্যাড স্কিপ। ──
   function handleDownloadClick(e) {
     e.preventDefault();
     const win = window.open('', '_blank');
     if (win) {
       win.location.href = SMARTLINK_URL3;
-      window.focus();
     }
 
     const isHlsFile = /\.m3u8(\?|$)/i.test(video.hlsPath || '');
@@ -837,7 +841,16 @@ atOptions = {
                 // অন্য সাইট থেকে হটলিংক করলে 403 Forbidden হবে। ──
                 <ProtectedPlayer src={`/api/video/${video.hlsPath}`} />
               ) : isDirectVideo ? (
-                <video controls autoPlay playsInline preload="metadata" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', background: '#000', objectFit: 'contain' }}>
+                <video
+                  controls
+                  autoPlay
+                  playsInline
+                  preload="metadata"
+                  controlsList="nodownload noremoteplayback noplaybackrate"
+                  disablePictureInPicture
+                  onContextMenu={e => e.preventDefault()}
+                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', background: '#000', objectFit: 'contain' }}
+                >
                   <source src={video.videoUrl} type="video/mp4" />
                 </video>
               ) : iframeStarted ? (
