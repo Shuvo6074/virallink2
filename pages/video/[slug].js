@@ -794,9 +794,6 @@ atOptions = {
           .thumb-full{opacity:0;transition:opacity 0.35s ease;}
           .thumb-full.loaded{opacity:1;}
           .duration-badge{position:absolute;bottom:4px;right:4px;background:rgba(0,0,0,0.45);color:#fff;font-size:0.62rem;font-weight:600;padding:1px 5px;border-radius:3px;line-height:1.3;z-index:2;}
-          .source-badge{position:absolute;top:4px;left:4px;font-size:0.6rem;font-weight:700;padding:1px 6px;border-radius:3px;line-height:1.4;z-index:2;color:#fff;}
-          .latest-badge{background:rgba(220,38,38,0.85);}
-          .batch-badge{background:rgba(0,0,0,0.55);}
           .related-card:hover .related-thumb img{transform:scale(1.03);}
           .related-info{padding:0.5rem 0.6rem;}
           .related-title-text{font-size:0.78rem;font-weight:600;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;line-height:1.3;margin-bottom:0.25rem;}
@@ -942,8 +939,6 @@ atOptions = {
                           }
                         }}
                       />
-                      {v.source === 'latest' && <span className="source-badge latest-badge">🆕 নতুন</span>}
-                      {v.source === 'batch' && <span className="source-badge batch-badge">📁 এই পাতা থেকে</span>}
                       {v.duration && <span className="duration-badge">{v.duration}</span>}
                     </div>
                     <div className="related-info">
@@ -986,8 +981,6 @@ atOptions = {
                         }
                       }}
                     />
-                    {v.source === 'latest' && <span className="source-badge latest-badge">🆕 নতুন</span>}
-                    {v.source === 'batch' && <span className="source-badge batch-badge">📁 এই পাতা থেকে</span>}
                     {v.duration && <span className="duration-badge">{v.duration}</span>}
                   </div>
                   <div className="related-info">
@@ -1010,7 +1003,7 @@ atOptions = {
              স্ক্রল করে শেষ করার পর স্বাভাবিকভাবেই ওইখানে চোখ পড়ে ── */}
         {latestSection.length > 0 && (
           <>
-            <div className="related-section-title">সর্বশেষ ভিডিও</div>
+            <div className="related-section-title">Latest Video</div>
             <div className="related-list">
               {latestSection.map(v => (
                 <a key={v.id} className="related-card" href={`/video/${v.slug}`} onClick={e => handleRelatedClick(e, v.slug)}>
@@ -1032,7 +1025,6 @@ atOptions = {
                         }
                       }}
                     />
-                    <span className="source-badge latest-badge">🆕 নতুন</span>
                     {v.duration && <span className="duration-badge">{v.duration}</span>}
                   </div>
                   <div className="related-info">
@@ -1076,8 +1068,6 @@ atOptions = {
                         }
                       }}
                     />
-                    {v.source === 'latest' && <span className="source-badge latest-badge">🆕 নতুন</span>}
-                    {v.source === 'batch' && <span className="source-badge batch-badge">📁 এই পাতা থেকে</span>}
                     {v.duration && <span className="duration-badge">{v.duration}</span>}
                   </div>
                   <div className="related-info">
