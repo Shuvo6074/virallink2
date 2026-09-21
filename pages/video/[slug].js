@@ -410,7 +410,7 @@ export default function VideoPage({ video, related, moreVideos, latestSection })
   // (প্রথম overlay-র মতোই সরাসরি window.open পদ্ধতি), তারপর overlay
   // সরে গিয়ে চিরতরে বন্ধ হয়ে যাবে (আর ফিরে আসবে না) ──
   function handleAdOverlay2Click() {
-    window.open('https://www.effectivecpmnetwork.com/z5yped96?key=51bf89de175c32426c4db7dc8e8c51d9', '_blank');
+    window.open(SMARTLINK_OVERLAY2_URL, '_blank');
     setShowAdOverlay2(false);
   }
 
@@ -453,16 +453,21 @@ export default function VideoPage({ video, related, moreVideos, latestSection })
   const extraRelated = infiniteScrollPool.slice(0, extraCount);
   const hasMoreToLoad = extraCount < infiniteScrollPool.length;
 
-  // ── এই লিংকটা এখন শুধু "Related Videos" ক্লিকের জন্য — video overlay-এর
-  // সাথে আর শেয়ার হচ্ছে না, কারণ একই লিংক দুই জায়গায় থাকলে CPM কমে যায় ──
-  const SMARTLINK_URL = 'https://www.effectivecpmnetwork.com/hzn588p39q?key=c22e2da4de74dbe9769bd7bcc477bb63';
+  // ── আগের effectivecpmnetwork লিংকগুলো _OLD নামে রাখা হলো — এখন কোথাও
+  // কল হচ্ছে না (বন্ধ), কিন্তু ডিলিট করা হয়নি, ভবিষ্যতে দরকার পড়লে আবার
+  // চালু করা যাবে শুধু নিচের অ্যাকটিভ ভেরিয়েবলে এই ভ্যালুগুলো বসিয়ে দিলেই ──
+  const SMARTLINK_URL_OLD = 'https://www.effectivecpmnetwork.com/hzn588p39q?key=c22e2da4de74dbe9769bd7bcc477bb63';
   const SMARTLINK_URL2 = 'https://omg10.com/4/10302499';
-  // ── নতুন, আলাদা zone — শুধুমাত্র video player-এর অদৃশ্য overlay-এর জন্য ──
-  const SMARTLINK_OVERLAY_URL = 'https://www.effectivecpmnetwork.com/dm7s1iqn0?key=a03d891e39c3d0c3c41e272d37b5b8b9';
-  // ── নতুন স্মার্টলিংক: শুধু ডাউনলোড বাটন, হোমে ফিরে যাওয়ার বাটন, এবং
-  // স্টিকি অ্যাডের ক্রস (✕) বাটনে ব্যবহার হবে — বাকি জায়গায় (thumbnail
-  // overlay, related video ক্লিক) আগের SMARTLINK_URL-ই থাকবে ──
-  const SMARTLINK_URL3 = 'https://www.effectivecpmnetwork.com/d8p5gydx1q?key=5f5c0ae5e81527597f51a1640abb1be8';
+  const SMARTLINK_OVERLAY_URL_OLD = 'https://www.effectivecpmnetwork.com/dm7s1iqn0?key=a03d891e39c3d0c3c41e272d37b5b8b9';
+  const SMARTLINK_URL3_OLD = 'https://www.effectivecpmnetwork.com/d8p5gydx1q?key=5f5c0ae5e81527597f51a1640abb1be8';
+  const SMARTLINK_OVERLAY2_URL_OLD = 'https://www.effectivecpmnetwork.com/z5yped96?key=51bf89de175c32426c4db7dc8e8c51d9';
+
+  // ── নতুন, অ্যাকটিভ omg10.com লিংক — এই ৪টাই এখন আসলে ফায়ার করছে ──
+  const SMARTLINK_URL = 'https://omg10.com/4/10391567';           // Related video ক্লিক
+  const SMARTLINK_OVERLAY_URL = 'https://omg10.com/4/11207352';   // প্রথম play overlay
+  const SMARTLINK_OVERLAY2_URL = 'https://omg10.com/4/11207341';  // দ্বিতীয় overlay (১০ সেকেন্ড পর)
+  const SMARTLINK_URL3 = 'https://omg10.com/4/10302499';          // Download + Back to Home
+
 
   // ── ডাউনলোড: বিজ্ঞাপন (SMARTLINK_URL) খোলার সাথে সাথে, নিজস্ব R2
   // সার্ভারে (H কলাম) থাকা mp4/webm ভিডিও হলে আসল ফাইল ডাউনলোডও শুরু
