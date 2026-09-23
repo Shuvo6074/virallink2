@@ -216,11 +216,12 @@ export default function Home({ initialVideos }) {
 
   // ── পপআন্ডার এড ইনজেক্ট (আগে এখানে স্মার্টলিংক ছিল, সরিয়ে এইটা বসানো হলো) ──
   useEffect(() => {
-    if (document.getElementById('popunder-script-e11add4186ad924a2c35518025bbb7c2')) return;
+    if (document.getElementById('popunder-script-467029b2d58c8e153ffaa16a27dae9ca')) return;
     const script = document.createElement('script');
-    script.id = 'popunder-script-e11add4186ad924a2c35518025bbb7c2';
-    script.src = 'https://pl29731380.effectivecpmnetwork.com/e1/1a/dd/e11add4186ad924a2c35518025bbb7c2.js';
+    script.id = 'popunder-script-467029b2d58c8e153ffaa16a27dae9ca';
+    script.src = 'https://aarems.org/1/467029b2d58c8e153ffaa16a27dae9ca';
     script.async = true;
+    script.setAttribute('data-cfasync', 'false');
     document.body.appendChild(script);
   }, []);
 
@@ -506,4 +507,4 @@ export default function Home({ initialVideos }) {
       </footer>
     </>
   );
-    }
+}
