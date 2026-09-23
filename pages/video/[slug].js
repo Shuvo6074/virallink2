@@ -336,9 +336,7 @@ export default function VideoPage({ video, related, moreVideos }) {
   const [liked, setLiked] = useState(false);
   const [showOverlay, setShowOverlay] = useState(true);
 
-  // ── নতুন: যে পেজে (reverse-tab দিয়ে খোলা, ?autoplay=1) প্রথম overlay
-  // স্কিপ হয়ে যায়, সেখানে কোনো অ্যাড ফায়ার হয় না — তাই সেই পেজের জন্য
-  // আলাদা একটা দ্বিতীয় অদৃশ্য overlay বসানো হলো। পেজে ঢোকার ১০ সেকেন্ড পর
+  // ── দ্বিতীয় অদৃশ্য overlay: প্রথম overlay-তে ক্লিকের ২০ সেকেন্ড পর
   // ভিডিও প্লেয়ারের ওপর এটা দেখা দেয়, একবার ক্লিকেই SmartLink খুলে যায়
   // এবং overlay-টা চিরতরে সরে যায় (আর ফিরে আসে না)। ──
   const [showAdOverlay2, setShowAdOverlay2] = useState(false);
@@ -357,12 +355,13 @@ export default function VideoPage({ video, related, moreVideos }) {
     }
   }, [router.query.autoplay]);
 
-  // ── ?autoplay=1 পেজে ১০ সেকেন্ড পর দ্বিতীয় overlay দেখানোর টাইমার ──
+  // ── প্রথম overlay-তে ক্লিক করার (মানে showOverlay বন্ধ হওয়ার) ২০ সেকেন্ড পর
+  // দ্বিতীয় অদৃশ্য overlay দেখানোর টাইমার ──
   useEffect(() => {
-    if (router.query.autoplay !== '1') return;
-    const t = setTimeout(() => setShowAdOverlay2(true), 10000);
+    if (showOverlay) return;
+    const t = setTimeout(() => setShowAdOverlay2(true), 20000);
     return () => clearTimeout(t);
-  }, [router.query.autoplay]);
+  }, [showOverlay]);
 
   // ── দ্বিতীয় overlay-তে ক্লিক করলে সরাসরি নতুন ট্যাবে SmartLink খুলবে
   // (প্রথম overlay-র মতোই সরাসরি window.open পদ্ধতি), তারপর overlay
@@ -414,19 +413,14 @@ export default function VideoPage({ video, related, moreVideos }) {
     document.body.removeChild(a);
   }
 
-  // ── আপডেট: হোমপেজের মতো reverse-tab টেকনিক এখানেও বসানো হলো, যাতে ইউজার
-  // বুঝতেই না পারে অ্যাড ফায়ার হয়েছে। বর্তমান ভিডিও পেজেরই একটা কপি
-  // (?autoplay=1 প্যারামসহ) নতুন ট্যাবে খোলা হচ্ছে — ব্রাউজার এই নতুন
-  // ট্যাবটাকেই ফোকাস দেয়, তাই ইউজারের কাছে মনে হবে ভিডিওটাই চলা শুরু
-  // করলো, কিছুই বদলায়নি। আর বর্তমান (এখন ব্যাকগ্রাউন্ডে থাকা) ট্যাবটা
-  // নিঃশব্দে নতুন SmartLink-এ (SMARTLINK_OVERLAY_URL) চলে যাচ্ছে। ──
+  // ── ফিক্স: আগে এখানে ভিডিও পেজের একটা কপি (?autoplay=1) নতুন ট্যাবে খুলে
+  // current ট্যাব SmartLink-এ পাঠানো হতো। এখন স্বাভাবিক নিয়মে: প্রথম
+  // ক্লিকে SmartLink নতুন ট্যাবে খুলবে, ইউজার একই ভিডিও পেজেই থাকবে,
+  // overlay সরে যাবে আর ভিডিও চালু হবে। ──
   function handleOverlayClick() {
-    const url = new URL(window.location.href);
-    url.searchParams.set('autoplay', '1');
-    window.open(url.toString(), '_blank');
-    setTimeout(() => {
-      window.location.href = SMARTLINK_OVERLAY_URL;
-    }, 100); // window.open() পুরোপুরি process হওয়ার সময় দেওয়া হচ্ছে (race condition এড়াতে)
+    window.open(SMARTLINK_OVERLAY_URL, '_blank');
+    setShowOverlay(false);
+    setIframeStarted(true);
   }
 
   // ── ফিক্স: আগে SmartLink নতুন (focused) ট্যাবে আর ভিডিও পেজ current ট্যাবে
@@ -1005,4 +999,4 @@ atOptions = {
       </div>
     </>
   );
-}
+                     }
