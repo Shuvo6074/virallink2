@@ -367,7 +367,7 @@ export default function VideoPage({ video, related, moreVideos }) {
   // (প্রথম overlay-র মতোই সরাসরি window.open পদ্ধতি), তারপর overlay
   // সরে গিয়ে চিরতরে বন্ধ হয়ে যাবে (আর ফিরে আসবে না) ──
   function handleAdOverlay2Click() {
-    window.open('https://viiukuhe.com/dc/?blockID=452167&subID=1link', '_blank');
+    window.open('https://www.effectivecpmnetwork.com/z5yped96?key=51bf89de175c32426c4db7dc8e8c51d9', '_blank');
     setShowAdOverlay2(false);
   }
 
@@ -390,10 +390,10 @@ export default function VideoPage({ video, related, moreVideos }) {
 
   // ── এই লিংকটা এখন শুধু "Related Videos" ক্লিকের জন্য — video overlay-এর
   // সাথে আর শেয়ার হচ্ছে না, কারণ একই লিংক দুই জায়গায় থাকলে CPM কমে যায় ──
-  const SMARTLINK_URL = 'https://viiukuhe.com/dc/?blockID=452168&subID=2link';
+  const SMARTLINK_URL = 'https://www.effectivecpmnetwork.com/hzn588p39q?key=c22e2da4de74dbe9769bd7bcc477bb63';
   const SMARTLINK_URL2 = 'https://omg10.com/4/10302499';
   // ── নতুন, আলাদা zone — শুধুমাত্র video player-এর অদৃশ্য overlay-এর জন্য ──
-  const SMARTLINK_OVERLAY_URL = 'https://viiukuhe.com/dc/?blockID=452146&subID=Viral+link+';
+  const SMARTLINK_OVERLAY_URL = 'https://www.effectivecpmnetwork.com/dm7s1iqn0?key=a03d891e39c3d0c3c41e272d37b5b8b9';
   // ── নতুন স্মার্টলিংক: শুধু ডাউনলোড বাটন, হোমে ফিরে যাওয়ার বাটন, এবং
   // স্টিকি অ্যাডের ক্রস (✕) বাটনে ব্যবহার হবে — বাকি জায়গায় (thumbnail
   // overlay, related video ক্লিক) আগের SMARTLINK_URL-ই থাকবে ──
