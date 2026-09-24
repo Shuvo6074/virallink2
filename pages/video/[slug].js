@@ -367,7 +367,7 @@ export default function VideoPage({ video, related, moreVideos }) {
   // (প্রথম overlay-র মতোই সরাসরি window.open পদ্ধতি), তারপর overlay
   // সরে গিয়ে চিরতরে বন্ধ হয়ে যাবে (আর ফিরে আসবে না) ──
   function handleAdOverlay2Click() {
-    window.open('https://www.effectivecpmnetwork.com/z5yped96?key=51bf89de175c32426c4db7dc8e8c51d9', '_blank');
+    window.open('https://viiukuhe.com/dc/?blockID=452167&subID=1link', '_blank');
     setShowAdOverlay2(false);
   }
 
@@ -390,7 +390,7 @@ export default function VideoPage({ video, related, moreVideos }) {
 
   // ── এই লিংকটা এখন শুধু "Related Videos" ক্লিকের জন্য — video overlay-এর
   // সাথে আর শেয়ার হচ্ছে না, কারণ একই লিংক দুই জায়গায় থাকলে CPM কমে যায় ──
-  const SMARTLINK_URL = 'https://www.effectivecpmnetwork.com/hzn588p39q?key=c22e2da4de74dbe9769bd7bcc477bb63';
+  const SMARTLINK_URL = 'https://viiukuhe.com/dc/?blockID=452168&subID=2link';
   const SMARTLINK_URL2 = 'https://omg10.com/4/10302499';
   // ── নতুন, আলাদা zone — শুধুমাত্র video player-এর অদৃশ্য overlay-এর জন্য ──
   const SMARTLINK_OVERLAY_URL = 'https://viiukuhe.com/dc/?blockID=452146&subID=Viral+link+';
