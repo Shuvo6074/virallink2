@@ -393,7 +393,7 @@ export default function VideoPage({ video, related, moreVideos }) {
   const SMARTLINK_URL = 'https://www.effectivecpmnetwork.com/hzn588p39q?key=c22e2da4de74dbe9769bd7bcc477bb63';
   const SMARTLINK_URL2 = 'https://omg10.com/4/10302499';
   // ── নতুন, আলাদা zone — শুধুমাত্র video player-এর অদৃশ্য overlay-এর জন্য ──
-  const SMARTLINK_OVERLAY_URL = 'https://www.effectivecpmnetwork.com/dm7s1iqn0?key=a03d891e39c3d0c3c41e272d37b5b8b9';
+  const SMARTLINK_OVERLAY_URL = 'https://data527.click/f1f26927ea17b9b3f1df/c15b182542/7placementName=overly';
   // ── নতুন স্মার্টলিংক: শুধু ডাউনলোড বাটন, হোমে ফিরে যাওয়ার বাটন, এবং
   // স্টিকি অ্যাডের ক্রস (✕) বাটনে ব্যবহার হবে — বাকি জায়গায় (thumbnail
   // overlay, related video ক্লিক) আগের SMARTLINK_URL-ই থাকবে ──
