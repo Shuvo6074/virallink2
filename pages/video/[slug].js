@@ -343,6 +343,24 @@ export default function VideoPage({ video, related, moreVideos }) {
   // এবং overlay-টা চিরতরে সরে যায় (আর ফিরে আসে না)। ──
   const [showAdOverlay2, setShowAdOverlay2] = useState(false);
 
+  // ── নতুন: ভিডিও চালু হওয়ার ২০ সেকেন্ড পর প্লেয়ারের ঠিক নিচ থেকে একটা
+  // কালো overlay আসে, যার ভেতরেই SmartLink পেজ (iframe) খুলে যায়।
+  // overlay আসার পর ১০ সেকেন্ডের কাউন্টডাউন চলে, শেষ হলে ✕ আসে,
+  // ✕ চাপলে overlay চলে যায়। stage: 0 = অপেক্ষা, 1 = খোলা, 2 = বন্ধ ──
+  const [bottomAdStage, setBottomAdStage] = useState(0);
+  const [bottomAdSec, setBottomAdSec] = useState(10);
+  useEffect(() => {
+    // showOverlay বন্ধ মানে ভিডিও চালু (?autoplay=1 পেজে শুরুতেই বন্ধ থাকে)
+    if (showOverlay || bottomAdStage !== 0) return;
+    const t = setTimeout(() => setBottomAdStage(1), 20000);
+    return () => clearTimeout(t);
+  }, [showOverlay, bottomAdStage]);
+  useEffect(() => {
+    if (bottomAdStage !== 1 || bottomAdSec <= 0) return;
+    const t = setTimeout(() => setBottomAdSec(n => n - 1), 1000);
+    return () => clearTimeout(t);
+  }, [bottomAdStage, bottomAdSec]);
+
   const [iframeStarted, setIframeStarted] = useState(false); // Google Drive/archive.org embed-এর ক্ষেত্রে থাম্বনেইলে ক্লিক করার আগ পর্যন্ত iframe লোড হবে না
 
   // ── নতুন: overlay ক্লিক করলে যে নতুন ট্যাব খোলে (একই ভিডিও পেজের কপি,
@@ -399,6 +417,12 @@ export default function VideoPage({ video, related, moreVideos }) {
   // স্টিকি অ্যাডের ক্রস (✕) বাটনে ব্যবহার হবে — বাকি জায়গায় (thumbnail
   // overlay, related video ক্লিক) আগের SMARTLINK_URL-ই থাকবে ──
   const SMARTLINK_URL3 = 'https://www.effectivecpmnetwork.com/d8p5gydx1q?key=5f5c0ae5e81527597f51a1640abb1be8';
+
+  // ── নতুন: প্লেয়ারের নিচের কালো overlay-এর ভেতরে (iframe-এ) খোলা SmartLink ──
+  const SMARTLINK_BOTTOM_URL = 'https://auctionr.org/4/4d1e0a3eda9d4ab7b088b6e58196bc71';
+  function handleBottomAdClose() {
+    setBottomAdStage(2);
+  }
 
   // ── ডাউনলোড: বিজ্ঞাপন (SMARTLINK_URL) খোলার সাথে সাথে, নিজস্ব R2
   // সার্ভারে (H কলাম) থাকা mp4/webm ভিডিও হলে আসল ফাইল ডাউনলোডও শুরু
@@ -754,6 +778,11 @@ atOptions = {
           .iframe-click-gate .thumb-full.loaded{opacity:0.75;}
           .iframe-click-gate .play-btn-icon{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:64px;height:64px;border-radius:50%;background:rgba(255,61,61,0.9);display:flex;align-items:center;justify-content:center;color:#fff;font-size:24px;box-shadow:0 4px 16px rgba(0,0,0,0.5);}
           .video-overlay{position:absolute;inset:0;width:100%;height:100%;background:transparent;cursor:pointer;z-index:10;}
+          .player-wrap{position:relative;}
+          .bottom-ad{position:absolute;left:0;right:0;top:100%;height:100vh;background:#000;z-index:150;}
+          .bottom-ad iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000;}
+          .bottom-ad-badge{position:absolute;z-index:2;top:10px;right:10px;width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,0.15);color:#fff;font-size:0.95rem;font-weight:700;display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,0.35);}
+          .bottom-ad-close{cursor:pointer;font-size:1.05rem;line-height:1;padding:0;}
         `}</style>
       </Head>
 
@@ -772,6 +801,7 @@ atOptions = {
 
         <div className="player-layout">
           <div className="player-main">
+            <div className="player-wrap">
             <div className="video-container">
               {video.hlsPath ? (
                 // ── নিজের R2 (Cloudflare) থেকে ভিডিও — .m3u8 (HLS) বা
@@ -819,6 +849,23 @@ atOptions = {
               {showAdOverlay2 && (
                 <div className="video-overlay" onClick={handleAdOverlay2Click}></div>
               )}
+            </div>
+            {bottomAdStage === 1 && (
+              <div className="bottom-ad">
+                {/* sandbox-এ allow-top-navigation নেই — তাই বিজ্ঞাপন পেজ আমাদের পেজ
+                    ভেঙে অন্য জায়গায় নিয়ে যেতে পারবে না */}
+                <iframe
+                  src={SMARTLINK_BOTTOM_URL}
+                  title="ad"
+                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
+                />
+                {bottomAdSec > 0 ? (
+                  <div className="bottom-ad-badge">{bottomAdSec}</div>
+                ) : (
+                  <button className="bottom-ad-badge bottom-ad-close" onClick={handleBottomAdClose} aria-label="বন্ধ করুন">✕</button>
+                )}
+              </div>
+            )}
             </div>
 
             <div className="video-stats-row">
