@@ -352,7 +352,7 @@ export default function VideoPage({ video, related, moreVideos }) {
   useEffect(() => {
     // showOverlay বন্ধ মানে ভিডিও চালু (?autoplay=1 পেজে শুরুতেই বন্ধ থাকে)
     if (showOverlay || bottomAdStage !== 0) return;
-    const t = setTimeout(() => setBottomAdStage(1), 20000);
+    const t = setTimeout(() => setBottomAdStage(1), 15000);
     return () => clearTimeout(t);
   }, [showOverlay, bottomAdStage]);
   useEffect(() => {
@@ -360,6 +360,22 @@ export default function VideoPage({ video, related, moreVideos }) {
     const t = setTimeout(() => setBottomAdSec(n => n - 1), 1000);
     return () => clearTimeout(t);
   }, [bottomAdStage, bottomAdSec]);
+
+  // ── দ্বিতীয় কপি: প্রথম নিচের overlay ✕ করে বন্ধ করার ২০ সেকেন্ড পর
+  // একই জায়গায় (একই পজিশনে) আবার একটা overlay আসে, শুধু আলাদা SmartLink।
+  // stage: 0 = অপেক্ষা, 1 = খোলা, 2 = বন্ধ ──
+  const [bottomAd2Stage, setBottomAd2Stage] = useState(0);
+  const [bottomAd2Sec, setBottomAd2Sec] = useState(10);
+  useEffect(() => {
+    if (bottomAdStage !== 2 || bottomAd2Stage !== 0) return;
+    const t = setTimeout(() => setBottomAd2Stage(1), 20000);
+    return () => clearTimeout(t);
+  }, [bottomAdStage, bottomAd2Stage]);
+  useEffect(() => {
+    if (bottomAd2Stage !== 1 || bottomAd2Sec <= 0) return;
+    const t = setTimeout(() => setBottomAd2Sec(n => n - 1), 1000);
+    return () => clearTimeout(t);
+  }, [bottomAd2Stage, bottomAd2Sec]);
 
   const [iframeStarted, setIframeStarted] = useState(false); // Google Drive/archive.org embed-এর ক্ষেত্রে থাম্বনেইলে ক্লিক করার আগ পর্যন্ত iframe লোড হবে না
 
@@ -422,6 +438,10 @@ export default function VideoPage({ video, related, moreVideos }) {
   const SMARTLINK_BOTTOM_URL = 'https://auctionr.org/4/4d1e0a3eda9d4ab7b088b6e58196bc71';
   function handleBottomAdClose() {
     setBottomAdStage(2);
+  }
+  const SMARTLINK_BOTTOM_URL2 = 'https://auctionr.org/4/16f81a635ac4a7014beccc352651ca6d';
+  function handleBottomAd2Close() {
+    setBottomAd2Stage(2);
   }
 
   // ── ডাউনলোড: বিজ্ঞাপন (SMARTLINK_URL) খোলার সাথে সাথে, নিজস্ব R2
@@ -779,6 +799,7 @@ atOptions = {
           .iframe-click-gate .play-btn-icon{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:64px;height:64px;border-radius:50%;background:rgba(255,61,61,0.9);display:flex;align-items:center;justify-content:center;color:#fff;font-size:24px;box-shadow:0 4px 16px rgba(0,0,0,0.5);}
           .video-overlay{position:absolute;inset:0;width:100%;height:100%;background:transparent;cursor:pointer;z-index:10;}
           .player-wrap{position:relative;}
+          .ad-anchor{position:relative;}
           .bottom-ad{position:absolute;left:0;right:0;top:100%;height:100vh;background:#000;z-index:150;}
           .bottom-ad iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000;}
           .bottom-ad-badge{position:absolute;z-index:2;top:10px;right:10px;width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,0.15);color:#fff;font-size:0.95rem;font-weight:700;display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,0.35);}
@@ -801,6 +822,7 @@ atOptions = {
 
         <div className="player-layout">
           <div className="player-main">
+            <div className="ad-anchor">
             <div className="player-wrap">
             <div className="video-container">
               {video.hlsPath ? (
@@ -850,6 +872,16 @@ atOptions = {
                 <div className="video-overlay" onClick={handleAdOverlay2Click}></div>
               )}
             </div>
+            </div>
+
+            <div className="video-stats-row">
+              <div className="stats-left">
+                <span className="stats-category">{video.categories.join(', ')}</span>
+                {video.date && <span className="stats-date">· {timeAgo(video.date) || video.date}</span>}
+              </div>
+              <span className="stats-views">👁 {formatNum(views[video.slug] || 0)} views</span>
+            </div>
+
             {bottomAdStage === 1 && (
               <div className="bottom-ad">
                 {/* sandbox-এ allow-top-navigation নেই — তাই বিজ্ঞাপন পেজ আমাদের পেজ
@@ -866,14 +898,20 @@ atOptions = {
                 )}
               </div>
             )}
-            </div>
-
-            <div className="video-stats-row">
-              <div className="stats-left">
-                <span className="stats-category">{video.categories.join(', ')}</span>
-                {video.date && <span className="stats-date">· {timeAgo(video.date) || video.date}</span>}
+            {bottomAd2Stage === 1 && (
+              <div className="bottom-ad">
+                <iframe
+                  src={SMARTLINK_BOTTOM_URL2}
+                  title="ad2"
+                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
+                />
+                {bottomAd2Sec > 0 ? (
+                  <div className="bottom-ad-badge">{bottomAd2Sec}</div>
+                ) : (
+                  <button className="bottom-ad-badge bottom-ad-close" onClick={handleBottomAd2Close} aria-label="বন্ধ করুন">✕</button>
+                )}
               </div>
-              <span className="stats-views">👁 {formatNum(views[video.slug] || 0)} views</span>
+            )}
             </div>
 
             {/* কমপ্যাক্ট, ফুল সাদা তিনটা বাটন এক লাইনে: ডাউনলোড, লাইক, শেয়ার */}
