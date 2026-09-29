@@ -360,6 +360,13 @@ export default function VideoPage({ video, related, moreVideos }) {
     const t = setTimeout(() => setBottomAdSec(n => n - 1), 1000);
     return () => clearTimeout(t);
   }, [bottomAdStage, bottomAdSec]);
+  // ── ১০ সেকেন্ড শেষে ক্রস চিহ্ন দেখা গেলেও, ইউজার ক্লিক না করলে
+  // overlay নিজে থেকেই ১ সেকেন্ড পর বন্ধ হয়ে যাবে ──
+  useEffect(() => {
+    if (bottomAdStage !== 1 || bottomAdSec > 0) return;
+    const t = setTimeout(() => setBottomAdStage(2), 1000);
+    return () => clearTimeout(t);
+  }, [bottomAdStage, bottomAdSec]);
 
   // ── দ্বিতীয় কপি: প্রথম নিচের overlay ✕ করে বন্ধ করার ২০ সেকেন্ড পর
   // একই জায়গায় (একই পজিশনে) আবার একটা overlay আসে, শুধু আলাদা SmartLink।
@@ -374,6 +381,11 @@ export default function VideoPage({ video, related, moreVideos }) {
   useEffect(() => {
     if (bottomAd2Stage !== 1 || bottomAd2Sec <= 0) return;
     const t = setTimeout(() => setBottomAd2Sec(n => n - 1), 1000);
+    return () => clearTimeout(t);
+  }, [bottomAd2Stage, bottomAd2Sec]);
+  useEffect(() => {
+    if (bottomAd2Stage !== 1 || bottomAd2Sec > 0) return;
+    const t = setTimeout(() => setBottomAd2Stage(2), 1000);
     return () => clearTimeout(t);
   }, [bottomAd2Stage, bottomAd2Sec]);
 
