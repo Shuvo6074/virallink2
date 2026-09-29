@@ -742,11 +742,11 @@ atOptions = {
           *{margin:0;padding:0;box-sizing:border-box;}
           body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,'Noto Sans Bengali',sans-serif;min-height:100vh;}
           header{background:#111;border-bottom:2px solid var(--accent);padding:0 4%;position:sticky;top:0;z-index:200;}
-          .header-inner{max-width:1400px;margin:0 auto;display:flex;align-items:center;height:60px;gap:1rem;}
+          .header-inner{max-width:1400px;margin:0 auto;display:flex;align-items:center;height:44px;gap:1rem;}
           .logo{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,'Noto Sans Bengali',sans-serif;font-size:1.8rem;letter-spacing:2px;color:var(--text);text-decoration:none;}
           .logo span{color:var(--accent);}
-          .main{max-width:1400px;margin:0 auto;padding:1rem 2%;}
-          .back-btn{display:inline-flex;align-items:center;gap:0.5rem;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:0.4rem 1rem;cursor:pointer;font-family:inherit;font-size:0.85rem;margin-bottom:1rem;text-decoration:none;transition:all 0.2s;}
+          .main{max-width:1400px;margin:0 auto;padding:0.5rem 2% 1rem;}
+          .back-btn{display:inline-flex;align-items:center;gap:0.5rem;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:0.4rem 1rem;cursor:pointer;font-family:inherit;font-size:0.85rem;margin-bottom:0.5rem;text-decoration:none;transition:all 0.2s;}
           .back-btn:hover{color:var(--text);border-color:var(--accent);}
           .player-layout{display:grid;grid-template-columns:1fr 320px;gap:1.5rem;}
           @media(max-width:768px){.player-layout{grid-template-columns:1fr;}.related-sidebar{display:none !important;}.related-mobile{display:block !important;}}
@@ -785,7 +785,7 @@ atOptions = {
           .related-info{padding:0.5rem 0.6rem;}
           .related-title-text{font-size:0.78rem;font-weight:600;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;line-height:1.3;margin-bottom:0.25rem;}
           .related-meta{font-size:0.7rem;color:var(--muted);}
-          .breadcrumb{font-size:0.8rem;color:var(--muted);margin-bottom:1rem;}
+          .breadcrumb{font-size:0.8rem;color:var(--muted);margin-bottom:0.5rem;}
           .breadcrumb a{color:var(--muted);text-decoration:none;}
           .breadcrumb a:hover{color:var(--accent);}
           .related-mobile{display:none;}
