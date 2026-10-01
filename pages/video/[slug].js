@@ -212,21 +212,18 @@ export async function getServerSideProps({ params, res: httpRes }) {
     const usedIds = new Set([video.id]);
     const relatedVideos = [];
 
-    // ── ফিক্স: আগে প্রতিটা ক্যাটাগরির শুধু সবচেয়ে প্রথম ৫টা ভিডিওই সবসময়
-    // দেখানো হতো (allVideos-এ যেগুলো আগে পড়ত)। এখন প্রতিটা ভিডিওর
-    // ক্যাটাগরিতে তার নিজের অবস্থান (position) বের করে, ঠিক তার পরের
-    // ভিডিও থেকে শুরু করে ৫টা নেওয়া হচ্ছে, আর শেষে পৌঁছালে আবার শুরু
-    // থেকে (wrap around) ঘুরে আসছে। ফলে ক্যাটাগরির আগে/মাঝখানে/পিছনের
-    // ভিডিও — ভিডিও অনুযায়ী আলাদা আলাদা অংশ থেকে দেখানো হবে, একই ৫টা
-    // সবসময় না এসে ইউজার related-এ ক্লিক করে যত ভিন্ন ভিডিওতে যাবে,
-    // ততই ক্যাটাগরির ভিন্ন ভিন্ন অংশ চোখে পড়বে। ──
+    // ── বাগ ফিক্স: আগে ভিডিওটা যে ক্যাটাগরিতে নেই সেখানে selfIdx = -1 হওয়ায়
+    // offset সবসময় 0 হতো, তাই অন্য ক্যাটাগরির সেই একই প্রথম ৫টা বারবার আসত।
+    // আর নিজের ক্যাটাগরিতেও শুধু ১ ঘর সরত, ফলে ৪টা ভিডিও একই থাকত। এখন
+    // প্রতিটা ক্যাটাগরির পুরো লিস্ট থেকে (শুরু/মাঝ/শেষ — যেকোনো জায়গা থেকে)
+    // random ৫টা বাছা হচ্ছে, তাই ভিডিও বদলালে related-ও বদলে যাবে। ──
     function pickRotated(cat, count) {
-      const catVideos = allVideos.filter(v => v.categories.includes(cat));
-      if (catVideos.length === 0) return [];
-      const selfIdx = catVideos.findIndex(v => v.id === video.id);
-      const offset = selfIdx >= 0 ? (selfIdx + 1) % catVideos.length : 0;
-      const rotated = [...catVideos.slice(offset), ...catVideos.slice(0, offset)];
-      return rotated.filter(v => !usedIds.has(v.id)).slice(0, count);
+      const pool = allVideos.filter(v => v.categories.includes(cat) && !usedIds.has(v.id));
+      for (let i = pool.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [pool[i], pool[j]] = [pool[j], pool[i]];
+      }
+      return pool.slice(0, count);
     }
 
     video.categories.forEach(cat => {
