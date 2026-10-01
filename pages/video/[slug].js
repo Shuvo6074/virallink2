@@ -476,6 +476,14 @@ export default function VideoPage({ video, related, moreVideos }) {
   const loadMoreRef = useRef(null);
 
   const initialRelated = related.slice(0, INITIAL_RELATED_SHOW);
+
+  // ── ফিরিয়ে আনা হলো: "Latest Videos" — related-এ নেই এমন সাইটের সবচেয়ে
+  // নতুন ভিডিওগুলো (moreVideos prop, আগে থেকেই getStaticProps থেকে পাঠানো
+  // হচ্ছিল কিন্তু কোথাও দেখানো হচ্ছিল না) আলাদাভাবে এখানে দেখানো হবে।
+  // video.id বদলালে (অন্য ভিডিওতে ক্লিক করলে) getStaticProps নতুন করে
+  // চলে, তাই moreVideos ও এই লিস্ট প্রতিটা ভিডিও পেজেই আলাদা/আপডেটেড হয়। ──
+  const LATEST_VIDEOS_COUNT = 12;
+  const latestVideos = moreVideos.slice(0, LATEST_VIDEOS_COUNT);
   // ── আপডেট: infiniteScrollPool এখন শুধু related-এর বাকি অংশ (১২-৪০), মোট
   // সর্বোচ্চ ৪০টা ভিডিও দেখাবে (moreVideos আর যোগ হচ্ছে না) — ৪০ শেষ হলে
   // স্ক্রল থেমে যাবে এবং নিচে ব্যানার এড দেখাবে। ──
@@ -847,6 +855,7 @@ atOptions = {
           .breadcrumb a{color:var(--muted);text-decoration:none;}
           .breadcrumb a:hover{color:var(--accent);}
           .related-mobile{display:none;}
+          .latest-videos-block{margin-bottom:1.5rem;}
           .ad-banner-slot{display:flex;justify-content:center;margin:1rem 0;overflow:hidden;}
           .ad-banner-slot iframe{max-width:100%;}
           .iframe-click-gate{position:absolute;inset:0;width:100%;height:100%;cursor:pointer;background:#000;}
@@ -1003,6 +1012,48 @@ atOptions = {
             <div style={{display:'flex',justifyContent:'center',margin:'1rem 0'}}>
               <div className="ad-banner-slot" id="ad-banner-mid"></div>
             </div>
+
+            {/* ── লেটেস্ট ভিডিও: মাঝের ব্যানার অ্যাডের ঠিক নিচে, Related Videos-এর
+                 আলাদা, সাইটের সবচেয়ে নতুন ভিডিওগুলো — ভিডিও বদলালে এটাও বদলে যায় ── */}
+            {latestVideos.length > 0 && (
+              <div className="latest-videos-block">
+                <div className="related-section-title">Latest Videos</div>
+                <div className="related-list">
+                  {latestVideos.map(v => (
+                    <a key={v.id} className="related-card" href={`/video/${v.slug}`} onClick={e => handleRelatedClick(e, v.slug)}>
+                      <div className="related-thumb">
+                        <img
+                          src={adaptiveThumb(v.thumbnail, 400)}
+                          alt={v.title}
+                          loading="lazy"
+                          onError={e => {
+                            if (e.target.dataset.fallback !== 'original' && v.thumbnail) {
+                              e.target.dataset.fallback = 'original';
+                              e.target.src = v.thumbnail;
+                            } else if (e.target.dataset.fallback !== 'category') {
+                              e.target.dataset.fallback = 'category';
+                              const fb = getFallbackThumb(v.id, v.categories, related);
+                              if (fb) e.target.src = fb; else e.target.style.visibility = 'hidden';
+                            } else {
+                              e.target.style.visibility = 'hidden';
+                            }
+                          }}
+                        />
+                        {v.duration && <span className="duration-badge">{v.duration}</span>}
+                      </div>
+                      <div className="related-info">
+                        <div className="related-title-text">{v.title}</div>
+                        <div className="related-meta">
+                          <span>{v.categories.join(', ')}</span>
+                          <span> · 👁 {formatNum(views[v.slug] || 0)}</span>
+                          {v.date && <span> · {timeAgo(v.date) || v.date}</span>}
+                        </div>
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Mobile related — শুরুতে শুধু প্রথম ব্যাচ (initialRelated) দেখানো হচ্ছে,
                 বাকিগুলো ব্যানার অ্যাডের নিচে স্ক্রল করলে ধীরে ধীরে লোড হবে */}
