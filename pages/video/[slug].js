@@ -348,6 +348,15 @@ export default function VideoPage({ video, related, moreVideos }) {
   // overlay আসার পর ১০ সেকেন্ডের কাউন্টডাউন চলে, শেষ হলে ✕ আসে,
   // ✕ চাপলে overlay চলে যায়। stage: 0 = অপেক্ষা, 1 = খোলা, 2 = বন্ধ ──
   const [bottomAdStage, setBottomAdStage] = useState(0);
+
+  const BOTTOM_AD_URLS = [
+    'https://auctionr.org/4/4d1e0a3eda9d4ab7b088b6e58196bc71',   // প্রাইমারি
+    'https://auctionr.org/4/084a8d8f29ce4b0ecf6bb0cfdf9ba25f',   // ব্যাকআপ (প্রাইমারি কাজ না করলে)
+  ];
+  const BOTTOM_AD2_URLS = [
+    'https://auctionr.org/4/16f81a635ac4a7014beccc352651ca6d',   // প্রাইমারি
+    'https://auctionr.org/4/5783b3115933158823dfa15f974d08ea',  // ব্যাকআপ (প্রাইমারি কাজ না করলে)
+  ];
   const [bottomAdSec, setBottomAdSec] = useState(10);
   useEffect(() => {
     // showOverlay বন্ধ মানে ভিডিও চালু (?autoplay=1 পেজে শুরুতেই বন্ধ থাকে)
@@ -373,6 +382,45 @@ export default function VideoPage({ video, related, moreVideos }) {
   // stage: 0 = অপেক্ষা, 1 = খোলা, 2 = বন্ধ ──
   const [bottomAd2Stage, setBottomAd2Stage] = useState(0);
   const [bottomAd2Sec, setBottomAd2Sec] = useState(10);
+
+  // ── Ad-fallback: নির্দিষ্ট সময়ের মধ্যে iframe লোড (onLoad) না হলে
+  // ব্যাকআপ লিংকে সুইচ করা হবে। cross-origin iframe-এর ভেতরে অ্যাডটা
+  // আসলেই দেখানো গেছে কিনা তা জাভাস্ক্রিপ্ট দিয়ে নিশ্চিতভাবে জানার উপায়
+  // নেই — তাই এটা শুধু "পেজ লোডই হতে পারেনি" এই অবস্থা ধরতে পারবে। ──
+  const [bottomAdSrcIdx, setBottomAdSrcIdx] = useState(0);
+  const [bottomAdLoaded, setBottomAdLoaded] = useState(false);
+  const [bottomAd2SrcIdx, setBottomAd2SrcIdx] = useState(0);
+  const [bottomAd2Loaded, setBottomAd2Loaded] = useState(false);
+  useEffect(() => {
+    if (bottomAdStage !== 1) return;
+    setBottomAdSrcIdx(0);
+    setBottomAdLoaded(false);
+  }, [bottomAdStage]);
+  // ── ব্যাকআপ লিংকে সুইচ হওয়ার সাথে সাথে ১০ সেকেন্ডের কাউন্টডাউন নতুন
+  // করে শুরু হবে, যাতে ব্যাকআপও পুরো সময় পায় ──
+  useEffect(() => {
+    if (bottomAdStage !== 1 || bottomAdSrcIdx === 0) return;
+    setBottomAdSec(10);
+  }, [bottomAdSrcIdx]);
+  useEffect(() => {
+    if (bottomAd2Stage !== 1) return;
+    setBottomAd2SrcIdx(0);
+    setBottomAd2Loaded(false);
+  }, [bottomAd2Stage]);
+  useEffect(() => {
+    if (bottomAd2Stage !== 1 || bottomAd2SrcIdx === 0) return;
+    setBottomAd2Sec(10);
+  }, [bottomAd2SrcIdx]);
+  useEffect(() => {
+    if (bottomAdStage !== 1 || bottomAdLoaded || bottomAdSrcIdx >= BOTTOM_AD_URLS.length - 1) return;
+    const t = setTimeout(() => setBottomAdSrcIdx(i => i + 1), 8000);
+    return () => clearTimeout(t);
+  }, [bottomAdStage, bottomAdLoaded, bottomAdSrcIdx]);
+  useEffect(() => {
+    if (bottomAd2Stage !== 1 || bottomAd2Loaded || bottomAd2SrcIdx >= BOTTOM_AD2_URLS.length - 1) return;
+    const t = setTimeout(() => setBottomAd2SrcIdx(i => i + 1), 8000);
+    return () => clearTimeout(t);
+  }, [bottomAd2Stage, bottomAd2Loaded, bottomAd2SrcIdx]);
   useEffect(() => {
     if (bottomAdStage !== 2 || bottomAd2Stage !== 0) return;
     const t = setTimeout(() => setBottomAd2Stage(1), 20000);
@@ -447,11 +495,9 @@ export default function VideoPage({ video, related, moreVideos }) {
   const SMARTLINK_URL3 = 'https://www.effectivecpmnetwork.com/d8p5gydx1q?key=5f5c0ae5e81527597f51a1640abb1be8';
 
   // ── নতুন: প্লেয়ারের নিচের কালো overlay-এর ভেতরে (iframe-এ) খোলা SmartLink ──
-  const SMARTLINK_BOTTOM_URL = 'https://auctionr.org/4/4d1e0a3eda9d4ab7b088b6e58196bc71';
   function handleBottomAdClose() {
     setBottomAdStage(2);
   }
-  const SMARTLINK_BOTTOM_URL2 = 'https://auctionr.org/4/16f81a635ac4a7014beccc352651ca6d';
   function handleBottomAd2Close() {
     setBottomAd2Stage(2);
   }
@@ -899,9 +945,12 @@ atOptions = {
                 {/* sandbox-এ allow-top-navigation নেই — তাই বিজ্ঞাপন পেজ আমাদের পেজ
                     ভেঙে অন্য জায়গায় নিয়ে যেতে পারবে না */}
                 <iframe
-                  src={SMARTLINK_BOTTOM_URL}
+                  key={bottomAdSrcIdx}
+                  src={BOTTOM_AD_URLS[bottomAdSrcIdx]}
                   title="ad"
                   sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
+                  onLoad={() => setBottomAdLoaded(true)}
+                  onError={() => setBottomAdSrcIdx(i => Math.min(i + 1, BOTTOM_AD_URLS.length - 1))}
                 />
                 {bottomAdSec > 0 ? (
                   <div className="bottom-ad-badge">{bottomAdSec}</div>
@@ -913,9 +962,12 @@ atOptions = {
             {bottomAd2Stage === 1 && (
               <div className="bottom-ad">
                 <iframe
-                  src={SMARTLINK_BOTTOM_URL2}
+                  key={bottomAd2SrcIdx}
+                  src={BOTTOM_AD2_URLS[bottomAd2SrcIdx]}
                   title="ad2"
                   sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
+                  onLoad={() => setBottomAd2Loaded(true)}
+                  onError={() => setBottomAd2SrcIdx(i => Math.min(i + 1, BOTTOM_AD2_URLS.length - 1))}
                 />
                 {bottomAd2Sec > 0 ? (
                   <div className="bottom-ad-badge">{bottomAd2Sec}</div>
