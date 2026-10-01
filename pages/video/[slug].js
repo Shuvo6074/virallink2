@@ -212,15 +212,32 @@ export async function getServerSideProps({ params, res: httpRes }) {
     const usedIds = new Set([video.id]);
     const relatedVideos = [];
 
+    // ── ফিক্স: আগে প্রতিটা ক্যাটাগরির শুধু সবচেয়ে প্রথম ৫টা ভিডিওই সবসময়
+    // দেখানো হতো (allVideos-এ যেগুলো আগে পড়ত)। এখন প্রতিটা ভিডিওর
+    // ক্যাটাগরিতে তার নিজের অবস্থান (position) বের করে, ঠিক তার পরের
+    // ভিডিও থেকে শুরু করে ৫টা নেওয়া হচ্ছে, আর শেষে পৌঁছালে আবার শুরু
+    // থেকে (wrap around) ঘুরে আসছে। ফলে ক্যাটাগরির আগে/মাঝখানে/পিছনের
+    // ভিডিও — ভিডিও অনুযায়ী আলাদা আলাদা অংশ থেকে দেখানো হবে, একই ৫টা
+    // সবসময় না এসে ইউজার related-এ ক্লিক করে যত ভিন্ন ভিডিওতে যাবে,
+    // ততই ক্যাটাগরির ভিন্ন ভিন্ন অংশ চোখে পড়বে। ──
+    function pickRotated(cat, count) {
+      const catVideos = allVideos.filter(v => v.categories.includes(cat));
+      if (catVideos.length === 0) return [];
+      const selfIdx = catVideos.findIndex(v => v.id === video.id);
+      const offset = selfIdx >= 0 ? (selfIdx + 1) % catVideos.length : 0;
+      const rotated = [...catVideos.slice(offset), ...catVideos.slice(0, offset)];
+      return rotated.filter(v => !usedIds.has(v.id)).slice(0, count);
+    }
+
     video.categories.forEach(cat => {
-      const matches = allVideos.filter(v => !usedIds.has(v.id) && v.categories.includes(cat)).slice(0, 5);
+      const matches = pickRotated(cat, 5);
       matches.forEach(v => { relatedVideos.push(v); usedIds.add(v.id); });
     });
 
     const allCategories = [...new Set(allVideos.flatMap(v => v.categories))];
     const otherCategories = allCategories.filter(cat => !video.categories.includes(cat));
     otherCategories.forEach(cat => {
-      const matches = allVideos.filter(v => !usedIds.has(v.id) && v.categories.includes(cat)).slice(0, 5);
+      const matches = pickRotated(cat, 5);
       matches.forEach(v => { relatedVideos.push(v); usedIds.add(v.id); });
     });
 
