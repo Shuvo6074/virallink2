@@ -255,7 +255,16 @@ export async function getServerSideProps({ params, res: httpRes }) {
     const leanify = v => ({ id: v.id, title: v.title, thumbnail: v.thumbnail, categories: v.categories, date: v.date, slug: v.slug, duration: v.duration });
     const moreVideos = allVideos.filter(v => !usedAfterRelated.has(v.id)).map(leanify);
 
-    return { props: { video, related, moreVideos } };
+    // ── ফিক্স: Latest Videos এখন related-এর সাথে কী বাদ পড়ল তার ওপর
+    // নির্ভর করে না — allVideos (নতুন থেকে পুরোনো সাজানো) থেকে সরাসরি
+    // সবচেয়ে নতুন ভিডিওগুলো নেওয়া হচ্ছে। আগে related-loop অনেক নতুন
+    // ভিডিও (ক্যাটাগরি মিলে যাওয়ায়) আগেই ব্যবহার করে ফেলত, তাই Latest
+    // Videos-এ সেগুলো আর থাকত না — ৪-৫ দিন আগের ভিডিও বাদ পড়ে ১০-১৫
+    // দিন আগেরগুলো দেখাত। এখন সেটা আর হবে না। ──
+    const LATEST_VIDEOS_COUNT = 12;
+    const latestVideos = allVideos.filter(v => v.id !== video.id).slice(0, LATEST_VIDEOS_COUNT).map(leanify);
+
+    return { props: { video, related, moreVideos, latestVideos } };
   } catch(e) {
     return { notFound: true };
   }
@@ -318,7 +327,7 @@ function ProtectedPlayer({ src }) {
   );
 }
 
-export default function VideoPage({ video, related, moreVideos }) {
+export default function VideoPage({ video, related, moreVideos, latestVideos }) {
   const router = useRouter();
   const [likes, setLikes] = useState({});
   // ── নেট স্পিড ডিটেকশন: প্রথমে 'normal' (SSR/প্রথম paint-এ hydration mismatch
@@ -493,14 +502,8 @@ export default function VideoPage({ video, related, moreVideos }) {
   const loadMoreRef = useRef(null);
 
   const initialRelated = related.slice(0, INITIAL_RELATED_SHOW);
-
-  // ── ফিরিয়ে আনা হলো: "Latest Videos" — related-এ নেই এমন সাইটের সবচেয়ে
-  // নতুন ভিডিওগুলো (moreVideos prop, আগে থেকেই getStaticProps থেকে পাঠানো
-  // হচ্ছিল কিন্তু কোথাও দেখানো হচ্ছিল না) আলাদাভাবে এখানে দেখানো হবে।
-  // video.id বদলালে (অন্য ভিডিওতে ক্লিক করলে) getStaticProps নতুন করে
-  // চলে, তাই moreVideos ও এই লিস্ট প্রতিটা ভিডিও পেজেই আলাদা/আপডেটেড হয়। ──
-  const LATEST_VIDEOS_COUNT = 12;
-  const latestVideos = moreVideos.slice(0, LATEST_VIDEOS_COUNT);
+  // latestVideos এখন সরাসরি getServerSideProps থেকে আসা prop — সবচেয়ে
+  // নতুন আপলোড হওয়া ভিডিও, related-এ কী আছে তার সাথে সম্পর্কহীন।
   // ── আপডেট: infiniteScrollPool এখন শুধু related-এর বাকি অংশ (১২-৪০), মোট
   // সর্বোচ্চ ৪০টা ভিডিও দেখাবে (moreVideos আর যোগ হচ্ছে না) — ৪০ শেষ হলে
   // স্ক্রল থেমে যাবে এবং নিচে ব্যানার এড দেখাবে। ──
