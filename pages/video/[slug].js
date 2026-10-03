@@ -174,7 +174,7 @@ function getHlsProxyPath(raw) {
   }
 }
 
-export async function getServerSideProps({ params, res: httpRes }) {
+export async function getServerSideProps({ params, query, res: httpRes }) {
   // ── পারফরম্যান্স ফিক্স: index.js-এর মতোই এই পেজও Edge-এ ৬০ সেকেন্ড
   // cache হবে, দ্বিতীয়বার একই ভিডিও পেজে কেউ গেলে সাথে সাথে লোড হবে। ──
   // ── রিকোয়েস্ট কমানোর ফিক্স: index.js-এর সাথে consistent, 60s থেকে
@@ -203,6 +203,12 @@ export async function getServerSideProps({ params, res: httpRes }) {
 
     const video = allVideos.find(v => v.slug === params.slug);
     if (!video) return { notFound: true };
+
+    // ── ?autoplay=1 ট্যাব: লিস্টগুলো প্রথম ট্যাব থেকেই আসবে (নিচে দেখুন),
+    // তাই সার্ভার আবার Latest/Related/More বানাবে না। ──
+    if (query && query.autoplay === '1') {
+      return { props: { video, related: [], moreVideos: [], latestVideos: [] } };
+    }
 
     // ── Related videos (আপডেট): শুধু এই ভিডিওর নিজের ক্যাটাগরি না, বরং
     // সাইটের সব ক্যাটাগরি থেকেই কিছু কিছু ভিডিও মিক্স করে দেখানো হচ্ছে।
@@ -324,8 +330,25 @@ function ProtectedPlayer({ src }) {
   );
 }
 
-export default function VideoPage({ video, related, moreVideos, latestVideos }) {
+export default function VideoPage({ video, related: relatedProp, moreVideos, latestVideos: latestProp }) {
   const router = useRouter();
+  // ── ?autoplay=1 ট্যাবে লিস্ট সার্ভার থেকে আবার আনা হয় না; প্রথম ট্যাব
+  // ওভারলে ক্লিকের সময় লিস্টটা localStorage-এ রেখে যায়, এখানে সেটাই দেখানো হয়
+  // (তাই দুই ট্যাবে একই ভিডিও, কিছু বদলায়নি মনে হবে)। ──
+  const [passedLists, setPassedLists] = useState(null);
+  useEffect(() => {
+    if (router.query.autoplay !== '1') return;
+    try {
+      const key = 'vhub_pass_' + video.slug;
+      const raw = localStorage.getItem(key);
+      if (!raw) return;
+      localStorage.removeItem(key);
+      const d = JSON.parse(raw);
+      if (d && Date.now() - d.t < 10 * 60 * 1000) setPassedLists(d);
+    } catch (e) {}
+  }, [router.query.autoplay, video.slug]);
+  const related = passedLists ? passedLists.related : relatedProp;
+  const latestVideos = passedLists ? passedLists.latestVideos : latestProp;
   const [likes, setLikes] = useState({});
   // ── নেট স্পিড ডিটেকশন: প্রথমে 'normal' (SSR/প্রথম paint-এ hydration mismatch
   // এড়াতে), mount-এর পর আসল অবস্থা (slow/normal/fast) অনুযায়ী state বদলায় ──
@@ -548,6 +571,10 @@ export default function VideoPage({ video, related, moreVideos, latestVideos }) 
   // করলো, কিছুই বদলায়নি। আর বর্তমান (এখন ব্যাকগ্রাউন্ডে থাকা) ট্যাবটা
   // নিঃশব্দে নতুন SmartLink-এ (SMARTLINK_OVERLAY_URL) চলে যাচ্ছে। ──
   function handleOverlayClick() {
+    try {
+      const lean = v => ({ id: v.id, title: v.title, thumbnail: v.thumbnail, categories: v.categories, date: v.date, slug: v.slug, duration: v.duration });
+      localStorage.setItem('vhub_pass_' + video.slug, JSON.stringify({ related: related.map(lean), latestVideos, t: Date.now() }));
+    } catch (e) {}
     const url = new URL(window.location.href);
     url.searchParams.set('autoplay', '1');
     window.open(url.toString(), '_blank');
