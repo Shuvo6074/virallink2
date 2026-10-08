@@ -396,7 +396,7 @@ export default function VideoPage({ video, related: relatedProp, moreVideos, lat
   const [bottomAdStage, setBottomAdStage] = useState(0);
 
   const BOTTOM_AD_URLS = [
-    'https://auctionr.org/4/4d1e0a3eda9d4ab7b088b6e58196bc71',   // প্রাইমারি
+    'https://auctionr.org/4/14b434bcb7ef5f51b1d4a8b545852048',   // প্রাইমারি
     'https://auctionr.org/4/084a8d8f29ce4b0ecf6bb0cfdf9ba25f',   // ব্যাকআপ (প্রাইমারি কাজ না করলে)
   ];
   const BOTTOM_AD2_URLS = [
