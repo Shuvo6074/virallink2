@@ -174,19 +174,16 @@ function getHlsProxyPath(raw) {
   }
 }
 
-export async function getServerSideProps({ params, query, res: httpRes }) {
-  // ── পারফরম্যান্স ফিক্স: index.js-এর মতোই এই পেজও Edge-এ ৬০ সেকেন্ড
-  // cache হবে, দ্বিতীয়বার একই ভিডিও পেজে কেউ গেলে সাথে সাথে লোড হবে। ──
-  // ── রিকোয়েস্ট কমানোর ফিক্স: index.js-এর সাথে consistent, 60s থেকে
-  // 900s (15 মিনিট) করা হলো — একই ভিডিও পেজ বারবার visitor দেখলে Worker
-  // প্রতিবার Sheet fetch করবে না, Cloudflare edge cache থেকেই সার্ভ হবে। ──
-  httpRes.setHeader('Cache-Control', 'public, s-maxage=900, stale-while-revalidate=1800');
-
-  try {
-    const rows = await getSheetRows();
+// ── CPU কমানোর ফিক্স: পুরো Sheet থেকে allVideos বানানো (map/filter/reverse/slug)
+// আগে প্রতিটা রিকোয়েস্টে হতো। getSheetRows() ৩০ সেকেন্ড একই rows array
+// ফেরত দেয়, তাই array একই থাকলে আগের হিসাব করা ফলাফলই ব্যবহার হবে। ──
+let _allRows = null;
+let _allVideos = null;
+function buildAllVideos(rows) {
+  if (_allRows === rows && _allVideos) return _allVideos;
     const uniqueSlugs = getUniqueSlugs(rows, slugify);
 
-    const allVideos = rows.map((row, i) => ({
+    const built = rows.map((row, i) => ({
       id: i,
       title:       row.c[0]?.v || 'Untitled',
       videoUrl:    row.c[1]?.v || '',
@@ -200,6 +197,22 @@ export async function getServerSideProps({ params, query, res: httpRes }) {
       slug:        uniqueSlugs[i]
     })).filter(v => v.title !== 'Title').reverse()
       .map((v, idx) => ({ ...v, pageBatch: Math.floor(idx / PER_PAGE) + 1 }));
+  _allRows = rows;
+  _allVideos = built;
+  return built;
+}
+
+export async function getServerSideProps({ params, query, res: httpRes }) {
+  // ── পারফরম্যান্স ফিক্স: index.js-এর মতোই এই পেজও Edge-এ ৬০ সেকেন্ড
+  // cache হবে, দ্বিতীয়বার একই ভিডিও পেজে কেউ গেলে সাথে সাথে লোড হবে। ──
+  // ── রিকোয়েস্ট কমানোর ফিক্স: index.js-এর সাথে consistent, 60s থেকে
+  // 900s (15 মিনিট) করা হলো — একই ভিডিও পেজ বারবার visitor দেখলে Worker
+  // প্রতিবার Sheet fetch করবে না, Cloudflare edge cache থেকেই সার্ভ হবে। ──
+  httpRes.setHeader('Cache-Control', 'public, s-maxage=900, stale-while-revalidate=1800');
+
+  try {
+    const rows = await getSheetRows();
+    const allVideos = buildAllVideos(rows);
 
     const video = allVideos.find(v => v.slug === params.slug);
     if (!video) return { notFound: true };
@@ -679,12 +692,16 @@ export default function VideoPage({ video, related: relatedProp, moreVideos, lat
     // Cloudflare D1 database ব্যবহার হচ্ছে। প্রতিবার পেজ খুললে এই ভিডিওর
     // slug আমাদের নিজস্ব API route (/api/track-view)-এ পাঠানো হয়, যেটা
     // সরাসরি D1-এ count +1 করে দেয়। এটা সবার জন্য COMMON, real সংখ্যা। ──
+    // ── ফিক্স: ?autoplay=1 ট্যাব আসলে একই ভিজিটের কপি, তাই সেখানে আবার গণনা
+    // করলে প্রতি ভিজিটে ভিউ ২ বার বাড়ত + D1-এ বাড়তি write যেত। ──
     try {
-      fetch('/api/track-view', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug: video.slug })
-      }).catch(() => {});
+      if (router.query.autoplay !== '1') {
+        fetch('/api/track-view', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ slug: video.slug })
+        }).catch(() => {});
+      }
     } catch(e) {}
 
     // ── D1 থেকে সব ভিডিওর ভিউ কাউন্ট একসাথে fetch করা হচ্ছে (fast) ──
