@@ -253,10 +253,10 @@ export async function getServerSideProps({ params, query, res: httpRes }) {
     // এখনও related-এ নেই) এখানে আলাদা করে রাখা হলো। পেলোড ছোট রাখতে শুধু
     // প্রয়োজনীয় ফিল্ডগুলোই (lean object) পাঠানো হচ্ছে। সাইটে যত ভিডিও
     // থাকুক না কেন (কয়েকশো/হাজার), এটাই ব্যবহার হবে "আরও ভিডিও" সেকশনে। ──
-    const usedAfterRelated = new Set(related.map(v => v.id));
-    usedAfterRelated.add(video.id);
     const leanify = v => ({ id: v.id, title: v.title, thumbnail: v.thumbnail, categories: v.categories, date: v.date, slug: v.slug, duration: v.duration });
-    const moreVideos = allVideos.filter(v => !usedAfterRelated.has(v.id)).map(leanify);
+    // পারফরম্যান্স: moreVideos কম্পোনেন্টে কোথাও ব্যবহার হয় না, অথচ হাজার ভিডিওর
+    // লিস্ট প্রতিটা পেজের HTML-এ (__NEXT_DATA__) ঢুকে যাচ্ছিল — তাই খালি পাঠানো হচ্ছে।
+    const moreVideos = [];
 
     // ── ফিক্স: Latest Videos এখন related-এর সাথে কী বাদ পড়ল তার ওপর
     // নির্ভর করে না — allVideos (নতুন থেকে পুরোনো সাজানো) থেকে সরাসরি
@@ -375,7 +375,7 @@ export default function VideoPage({ video, related: relatedProp, moreVideos, lat
   // ক্লিয়ার/শার্প থাম্বনেইল সরাসরি দেখানো হয় ──
   const adaptiveThumb = (url, width) => {
     if (netTier === 'slow') return thumbUrl(url, Math.round(width * 0.55), 55);
-    if (netTier === 'fast') return thumbUrl(url, Math.round(width * 1.25), 95);
+    if (netTier === 'fast') return thumbUrl(url, Math.round(width * 1.25), 82);
     return thumbUrl(url, width);
   };
   const [views, setViews] = useState({});
@@ -387,7 +387,6 @@ export default function VideoPage({ video, related: relatedProp, moreVideos, lat
   // আলাদা একটা দ্বিতীয় অদৃশ্য overlay বসানো হলো। পেজে ঢোকার ১০ সেকেন্ড পর
   // ভিডিও প্লেয়ারের ওপর এটা দেখা দেয়, একবার ক্লিকেই SmartLink খুলে যায়
   // এবং overlay-টা চিরতরে সরে যায় (আর ফিরে আসে না)। ──
-  const [showAdOverlay2, setShowAdOverlay2] = useState(false);
 
   // ── নতুন: ভিডিও চালু হওয়ার ২০ সেকেন্ড পর প্লেয়ারের ঠিক নিচ থেকে একটা
   // কালো overlay আসে, যার ভেতরেই SmartLink পেজ (iframe) খুলে যায়।
@@ -497,20 +496,24 @@ export default function VideoPage({ video, related: relatedProp, moreVideos, lat
     }
   }, [router.query.autoplay]);
 
-  // ── ?autoplay=1 পেজে ১০ সেকেন্ড পর দ্বিতীয় overlay দেখানোর টাইমার ──
+  // ── ?autoplay=1 (দ্বিতীয়) পেজে ১০ সেকেন্ড পর পপআন্ডার স্ক্রিপ্ট লোড হবে।
+  // আগের অদৃশ্য overlay সরিয়ে দেওয়া হয়েছে; স্ক্রিপ্ট ইউজারের স্বাভাবিক
+  // ক্লিকেই কাজ করে। পেজ ছাড়লে/বদলালে টাইমার ও স্ক্রিপ্ট দুটোই পরিষ্কার হয়। ──
   useEffect(() => {
     if (router.query.autoplay !== '1') return;
-    const t = setTimeout(() => setShowAdOverlay2(true), 10000);
-    return () => clearTimeout(t);
+    let scriptEl = null;
+    const t = setTimeout(() => {
+      scriptEl = document.createElement('script');
+      scriptEl.setAttribute('data-cfasync', 'false');
+      scriptEl.src = 'https://aarems.org/1/e11add4186ad924a2c35518025bbb7c2';
+      scriptEl.async = true;
+      document.body.appendChild(scriptEl);
+    }, 10000);
+    return () => {
+      clearTimeout(t);
+      if (scriptEl && scriptEl.parentNode) scriptEl.parentNode.removeChild(scriptEl);
+    };
   }, [router.query.autoplay]);
-
-  // ── দ্বিতীয় overlay-তে ক্লিক করলে সরাসরি নতুন ট্যাবে SmartLink খুলবে
-  // (প্রথম overlay-র মতোই সরাসরি window.open পদ্ধতি), তারপর overlay
-  // সরে গিয়ে চিরতরে বন্ধ হয়ে যাবে (আর ফিরে আসবে না) ──
-  function handleAdOverlay2Click() {
-    window.open('https://www.effectivecpmnetwork.com/z5yped96?key=51bf89de175c32426c4db7dc8e8c51d9', '_blank');
-    setShowAdOverlay2(false);
-  }
 
   // ── Infinite scroll (নতুন): শুরুতে related videos-এর প্রথম ১২টাই দেখানো হয়
   // (related-mobile / desktop sidebar-এ)। ব্যানার অ্যাডের নিচে ইউজার স্ক্রল
@@ -978,9 +981,6 @@ atOptions = {
               )}
               {showOverlay && (
                 <div className="video-overlay" onClick={handleOverlayClick}></div>
-              )}
-              {showAdOverlay2 && (
-                <div className="video-overlay" onClick={handleAdOverlay2Click}></div>
               )}
             </div>
             </div>
