@@ -837,22 +837,42 @@ export default function VideoPage({ video, related: relatedProp, moreVideos, lat
   }, [video.id]);
 
 
-  // ── নতুন: related videos-এর প্রথম ১২টার পর profitableratecpmnetwork-এর
-  // container-based banner অ্যাড (আগে এখানে highperformanceformat-এর
-  // 728x90 ছিল, সেটার বদলে এই নতুনটা বসানো হলো)। ইউজারের দেওয়া কোডে
-  // script আর div sibling হিসেবে ছিল, তাই এখানেও script-টা container
-  // div-এর ঠিক আগে বসানো হচ্ছে যাতে নেটওয়ার্কের নিজস্ব লজিক ঠিকভাবে
-  // ওই div-টাকেই খুঁজে পায়। ──
+  // Inject highperformanceformat.com 728x90 banner ads (isolated iframe, runs twice)
   useEffect(() => {
-    const el = document.getElementById('container-e474628fdcec06f52100e0b84b3fa759');
-    if (!el || el.dataset.loaded) return;
-    el.dataset.loaded = 'true';
-    const script = document.createElement('script');
-    script.src = 'https://pl30569233.profitableratecpmnetwork.com/e474628fdcec06f52100e0b84b3fa759/invoke.js';
-    script.async = true;
-    script.setAttribute('data-cfasync', 'false');
-    el.parentNode.insertBefore(script, el);
+    function buildAdIframe(key, width, height) {
+      const iframe = document.createElement('iframe');
+      iframe.style.width = width + 'px';
+      iframe.style.height = height + 'px';
+      iframe.style.maxWidth = '100%';
+      iframe.style.border = '0';
+      iframe.style.overflow = 'hidden';
+      iframe.scrolling = 'no';
+
+      const html = `<!DOCTYPE html><html><head><style>html,body{margin:0;padding:0;overflow:hidden;}</style></head><body>
+<script type="text/javascript">
+atOptions = {
+  'key' : '${key}',
+  'format' : 'iframe',
+  'height' : ${height},
+  'width' : ${width},
+  'params' : {}
+};
+</script>
+<script type="text/javascript" src="https://www.highperformanceformat.com/${key}/invoke.js"></script>
+</body></html>`;
+
+      iframe.srcdoc = html;
+      return iframe;
+    }
+
+    ['ad-banner-mid'].forEach(id => {
+      const container = document.getElementById(id);
+      if (!container || container.dataset.loaded) return;
+      container.dataset.loaded = 'true';
+      container.appendChild(buildAdIframe('408f7fe8d5566eee24a05d83101d2638', 300, 250));
+    });
   }, [video.id]);
+
 
   // ── নতুন: ওপরের ব্যানার অ্যাডের (২c6dbe...) হুবহু কপি — related videos
   // এর ৪০টাই (বা যত আছে) লোড হয়ে শেষ হলে (hasMoreToLoad = false) সবার
@@ -1025,7 +1045,7 @@ atOptions = {
           .bottom-ad iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000;}
           .bottom-ad-badge{position:absolute;z-index:2;top:10px;right:10px;width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,0.15);color:#fff;font-size:0.95rem;font-weight:700;display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,0.35);}
           .bottom-ad-close{cursor:pointer;font-size:1.05rem;line-height:1;padding:0;}
-          .inline-ad-overlay{position:relative;width:100%;height:100vh;height:100svh;margin:1rem 0;background:#000;overflow:hidden;}
+          .inline-ad-overlay{position:relative;width:100%;height:100vh;margin:1rem 0;background:#000;overflow:hidden;}
           .inline-ad-overlay iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000;}
         `}</style>
       </Head>
@@ -1161,9 +1181,10 @@ atOptions = {
               </div>
             )}
 
-            {/* ── মাঝের ওভারলে (আগে এখানে 300x250 ব্যানার ছিল): ফোন-স্ক্রিন সাইজ
-                 জায়গা, ইউজার স্ক্রল শুরু করলে SmartLink লোড শুরু হয় ── */}
-            <InlineAdOverlay urls={MID_AD_URLS} resetKey={video.id} />
+            {/* 300x250 Banner Ad - below player, above related */}
+            <div style={{display:'flex',justifyContent:'center',margin:'1rem 0'}}>
+              <div className="ad-banner-slot" id="ad-banner-mid"></div>
+            </div>
 
             {/* ── লেটেস্ট ভিডিও: মাঝের ব্যানার অ্যাডের ঠিক নিচে, Related Videos-এর
                  আলাদা, সাইটের সবচেয়ে নতুন ভিডিওগুলো — ভিডিও বদলালে এটাও বদলে যায় ── */}
@@ -1292,7 +1313,9 @@ atOptions = {
           </div>
         </div>
 
-        <div id="container-e474628fdcec06f52100e0b84b3fa759"></div>
+        {/* ── মাঝের ওভারলে: related ভিডিওর প্রথম ব্যাচ আর ইনফিনিট-স্ক্রলের
+             মাঝখানে (আগে এখানে profitableratecpmnetwork ব্যানার ছিল) ── */}
+        <InlineAdOverlay urls={MID_AD_URLS} resetKey={video.id} />
 
         {/* ── Infinite scroll: ইউজার স্ক্রল করলে ধীরে ধীরে
              আরও related videos লোড হয়ে এখানে দেখানো হবে ── */}
