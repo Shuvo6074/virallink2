@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Head from "next/head";
 import { getSheetRows } from "../lib/sheetData";
 
@@ -8,6 +8,26 @@ const PER_PAGE = 30;
 // ── ভিডিও কার্ডে ক্লিক করলেই এই SmartLink নতুন ট্যাবে খুলবে (প্রতি ক্লিকেই,
 // কোনো frequency cap ছাড়া) — লিংক বদলাতে হলে শুধু এই ভ্যারিয়েবলটা বদলালেই হবে ──
 const SMARTLINK_URL = 'https://www.effectivecpmnetwork.com/c2sf8tayk?key=984425aa15cb3a2477cbdb8098fbf9ff';
+
+// ── নতুন: হোমপেজের ফোন-স্ক্রিন সাইজ (100vh) অ্যাড ওভারলে — মোট ২টা:
+//   ১) মাঝের ওভারলে: ১৫তম ভিডিওর পর, নেটিভ ব্যানারের ঠিক ওপরে (ব্যানার আগের মতোই নিচে থাকে)
+//   ২) শেষের ওভারলে: পেজের সব ভিডিওর একদম নিচে
+// প্রতিটায় ২টা SmartLink: প্রথমটা HOME_AD_FALLBACK_MS-এর মধ্যে লোড না হলে ব্যাকআপটা চলবে
+// (আর কাউন্টডাউন আবার শুরু)। ইউজার ওভারলের ঠিক আগের HOME_AD_LEAD_VIDEOS টা ভিডিওতে
+// পৌঁছালে (এবং স্ক্রল শুরু করে থাকলে) লোড শুরু হয়; ইউজার ওভারলেতে পৌঁছানোর
+// পর HOME_AD_SECONDS সেকেন্ড পর ওভারলে নিজে চলে যায়। ──
+const HOME_MID_AD_URLS = [
+  'https://auctionr.org/4/a36c9085f79538a4ba68c6c6b5df46b2',   // মাঝের ওভারলে — প্রাইমারি
+  'https://auctionr.org/4/6beba1eb6737f6b8e5647a91ad7a790f',   // মাঝের ওভারলে — ব্যাকআপ
+];
+const HOME_END_AD_URLS = [
+  'https://auctionr.org/4/a36c9085f79538a4ba68c6c6b5df46b2',   // শেষের ওভারলে — প্রাইমারি
+  'https://auctionr.org/4/6beba1eb6737f6b8e5647a91ad7a790f',   // শেষের ওভারলে — ব্যাকআপ
+];
+const HOME_AD_SECONDS = 3;          // ইউজার পৌঁছানোর পর কত সেকেন্ডে ওভারলে চলে যাবে
+const HOME_AD_LEAD_VIDEOS = 5;      // ওভারলের কত টা ভিডিও আগে থেকে লোড শুরু (বাড়ালে আরও আগে লোড শুরু)
+const HOME_MID_AD_AFTER = 15;       // কত নম্বর ভিডিওর পর মাঝের ওভারলে (নেটিভ ব্যানারের সাথে মিলিয়ে ১৫)
+const HOME_AD_FALLBACK_MS = 8000;   // প্রথম লিংক এতক্ষণে লোড না হলে ব্যাকআপে সুইচ
 
 function slugify(text) {
   return text.toString().toLowerCase()
@@ -163,6 +183,119 @@ export async function getServerSideProps({ res: httpRes }) {
   } catch(e) {
     return { props: { initialVideos: [] } };
   }
+}
+
+// ── ScrollAdOverlay — হোমপেজের ভিডিও গ্রিডের ভেতরে/নিচে বসানো ফোন-স্ক্রিন সাইজের কালো অ্যাড ওভারলে ──
+//  • লোড শুরু: ইউজার স্ক্রল শুরু করেছে (>80px) + পেজের নিজের লোড শেষ + ইউজার ওভারলের
+//    HOME_AD_LEAD_VIDEOS টা ভিডিও আগের "ট্রিগার কার্ডে" (data-ad-trigger) পৌঁছেছে।
+//    পেজে ঢোকার সাথে সাথে কিছুই লোড হয় না।
+//  • স্লো নেট / ডেটা-সেভার (slowNet): আগে থেকে লোড না করে, ওভারলে সত্যিই স্ক্রিনে এলে তবেই লোড।
+//  • ফলব্যাক: HOME_AD_FALLBACK_MS-এ onLoad না এলে ব্যাকআপ URL + কাউন্টডাউন আবার শুরু।
+//  • কাউন্টডাউন (seconds): শুধু যতক্ষণ ওভারলের অন্তত অর্ধেক স্ক্রিনে দেখা যায়; শেষ হলে ওভারলে
+//    নিজে চলে যায় আর জায়গাটাও গুটিয়ে যায়।
+function ScrollAdOverlay({ urls, triggerKey, resetKey, layoutKey, seconds, slowNet }) {
+  const ref = useRef(null);
+  const [scrolled, setScrolled] = useState(false);
+  const [pageReady, setPageReady] = useState(false);
+  const [near, setNear] = useState(false);
+  const [started, setStarted] = useState(false);
+  const [inView, setInView] = useState(false);
+  const [srcIdx, setSrcIdx] = useState(0);
+  const [loaded, setLoaded] = useState(false);
+  const [sec, setSec] = useState(seconds);
+  const [closed, setClosed] = useState(false);
+
+  // পেজ/ক্যাটাগরি বদলালে সব রিসেট
+  useEffect(() => {
+    setScrolled(false); setNear(false); setStarted(false); setInView(false);
+    setSrcIdx(0); setLoaded(false); setSec(seconds); setClosed(false);
+  }, [resetKey]);
+
+  // ইউজার সত্যিই স্ক্রল শুরু করেছে কিনা
+  useEffect(() => {
+    if (scrolled) return;
+    if (window.scrollY > 80) { setScrolled(true); return; }
+    const onScroll = () => { if (window.scrollY > 80) setScrolled(true); };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [scrolled, resetKey]);
+
+  // পেজের নিজের লোড শেষ হয়েছে কিনা
+  useEffect(() => {
+    if (document.readyState === 'complete') { setPageReady(true); return; }
+    const onLoad = () => setPageReady(true);
+    window.addEventListener('load', onLoad);
+    return () => window.removeEventListener('load', onLoad);
+  }, []);
+
+  // ট্রিগার কার্ড (ওভারলের ৫টা ভিডিও আগের কার্ড) স্ক্রিনে এসেছে বা পেরিয়ে গেছে কিনা +
+  // ওভারলে নিজে ≥৫০% দেখা যাচ্ছে কিনা
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || closed) return;
+    const trigger = document.querySelector('[data-ad-trigger~="' + triggerKey + '"]');
+    let nearObs = null;
+    if (trigger) {
+      nearObs = new IntersectionObserver(es => {
+        const e = es[es.length - 1];
+        if (e.isIntersecting || e.boundingClientRect.top < 0) setNear(true);
+      });
+      nearObs.observe(trigger);
+    } else {
+      // ট্রিগার কার্ড না পেলে (ভিডিও কম) ওভারলের এক স্ক্রিন আগে থেকে ধরা হবে
+      nearObs = new IntersectionObserver(es => { if (es[0].isIntersecting) setNear(true); }, { rootMargin: '0px 0px 100% 0px' });
+      nearObs.observe(el);
+    }
+    const viewObs = new IntersectionObserver(es => setInView(es[0].isIntersecting), { threshold: 0.5 });
+    viewObs.observe(el);
+    return () => { nearObs.disconnect(); viewObs.disconnect(); };
+  }, [closed, triggerKey, resetKey, layoutKey]);
+
+  // লোড শুরু (একবারই)
+  useEffect(() => {
+    if (started || !scrolled || !pageReady) return;
+    if (slowNet ? inView : near) setStarted(true);
+  }, [scrolled, pageReady, near, inView, slowNet, started]);
+
+  // কাউন্টডাউন — শুধু যতক্ষণ ওভারলে স্ক্রিনে দেখা যাচ্ছে
+  useEffect(() => {
+    if (!started || !inView || sec <= 0) return;
+    const t = setTimeout(() => setSec(n => n - 1), 1000);
+    return () => clearTimeout(t);
+  }, [started, inView, sec]);
+
+  // কাউন্টডাউন শেষ হলে ওভারলে চলে যাবে
+  useEffect(() => {
+    if (started && sec <= 0) setClosed(true);
+  }, [started, sec]);
+
+  // ফলব্যাক: onLoad না এলে ব্যাকআপ URL + কাউন্টডাউন রিসেট
+  useEffect(() => {
+    if (!started || loaded || srcIdx >= urls.length - 1) return;
+    const t = setTimeout(() => { setSrcIdx(i => i + 1); setSec(seconds); }, HOME_AD_FALLBACK_MS);
+    return () => clearTimeout(t);
+  }, [started, loaded, srcIdx, urls.length, seconds]);
+
+  if (closed) return null;
+
+  return (
+    <div ref={ref} style={{ gridColumn: '1/-1', position: 'relative', width: '100%', height: '100vh', margin: '1.5rem 0', background: '#000', overflow: 'hidden' }}>
+      {started && (
+        <iframe
+          key={srcIdx}
+          src={urls[srcIdx]}
+          title="ad"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0, background: '#000' }}
+          onLoad={() => setLoaded(true)}
+          onError={() => { setLoaded(false); setSrcIdx(i => Math.min(i + 1, urls.length - 1)); setSec(seconds); }}
+        />
+      )}
+      {started && (
+        <div style={{ position: 'absolute', zIndex: 2, top: 10, right: 10, width: 34, height: 34, borderRadius: '50%', background: 'rgba(255,255,255,0.15)', color: '#fff', fontSize: '0.95rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.35)' }}>{sec}</div>
+      )}
+    </div>
+  );
 }
 
 export default function Home({ initialVideos }) {
@@ -364,6 +497,10 @@ export default function Home({ initialVideos }) {
                 <a
                   className="video-card"
                   href={`/video/${v.slug}`}
+                  data-ad-trigger={[
+                    i === HOME_MID_AD_AFTER - HOME_AD_LEAD_VIDEOS ? 'home-mid' : '',
+                    i === paginated.length - HOME_AD_LEAD_VIDEOS ? 'home-end' : '',
+                  ].join(' ').trim() || undefined}
                   onClick={(e) => {
                     // ── ফিক্স (popup blocker সমস্যা সমাধান): আগে window.open('')
                     // দিয়ে খালি ট্যাব "reserve" করা হচ্ছে — এটা ক্লিক ইভেন্টের
@@ -424,6 +561,16 @@ export default function Home({ initialVideos }) {
                     </div>
                   </div>
                 </a>
+                {(i + 1) === HOME_MID_AD_AFTER && (
+                  <ScrollAdOverlay
+                    urls={HOME_MID_AD_URLS}
+                    triggerKey="home-mid"
+                    resetKey={`${currentPage}|${activeCat}`}
+                    layoutKey={paginated.length}
+                    seconds={HOME_AD_SECONDS}
+                    slowNet={netTier === 'slow'}
+                  />
+                )}
                 {(i + 1) % 15 === 0 && (
                   <div
                     style={{gridColumn:'1/-1',margin:'1.5rem 0',padding:'0.5rem 0',borderTop:'1px solid var(--border)',borderBottom:'1px solid var(--border)',display:'flex',justifyContent:'center',minHeight:'100px'}}
@@ -445,6 +592,18 @@ export default function Home({ initialVideos }) {
               </React.Fragment>
             ))}
           </div>
+        )}
+
+        {/* ── শেষের ওভারলে: এই পেজের সব ভিডিওর একদম নিচে ── */}
+        {!loading && !error && paginated.length > 0 && (
+          <ScrollAdOverlay
+            urls={HOME_END_AD_URLS}
+            triggerKey="home-end"
+            resetKey={`${currentPage}|${activeCat}`}
+            layoutKey={paginated.length}
+            seconds={HOME_AD_SECONDS}
+            slowNet={netTier === 'slow'}
+          />
         )}
 
         {totalPages > 1 && (
