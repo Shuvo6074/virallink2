@@ -144,6 +144,119 @@ function getUniqueSlugs(rows, slugifyFn) {
   });
 }
 
+// ── নতুন: InlineAdOverlay — পেজের ভেতরে (স্ক্রলের মাঝে) বসানো ফোন-স্ক্রিন সাইজের
+// (100vh) কালো অ্যাড ওভারলে। নিচের bottom-ad ওভারলের মতোই কাজ করে:
+//   • ২টা SmartLink (urls) — প্রথমটা ৮ সেকেন্ডে লোড (onLoad) না হলে ব্যাকআপে সুইচ
+//   • সুইচ হলে ১০ সেকেন্ডের কাউন্টডাউন নতুন করে শুরু
+//   • কাউন্টডাউন শেষে ✕; ক্লিক না করলে ১ সেকেন্ড পর নিজেই বন্ধ (জায়গাটাও গুটিয়ে যায়)
+// পার্থক্য: এটা পেজের স্ক্রলের ভেতরে থাকে, আর SmartLink লোড শুরু হয় তখনই যখন
+// ইউজার স্ক্রল করা শুরু করেছে এবং ওভারলেটা স্ক্রিনের প্রায় এক স্ক্রিন নিচে
+// পর্যন্ত চলে এসেছে এবং পেজের নিজের লোড শেষ হয়েছে (ইউজার পৌঁছানোর আগেই লোড শেষ)।
+// কাউন্টডাউন চলে শুধু যতক্ষণ ওভারলের অন্তত অর্ধেক স্ক্রিনে দেখা যায়।
+// urls-এ 'PASTE_' দিয়ে শুরু করা প্লেসহোল্ডার থাকলে ওভারলে দেখাবেই না। ──
+const AD_LOOKAHEAD = '0px 0px 100% 0px'; // স্ক্রিনের নিচে কতটা আগে থেকে লোড শুরু (100% = ১ স্ক্রিন)
+
+function InlineAdOverlay({ urls, resetKey }) {
+  const validUrls = (urls || []).filter(u => u && !/^PASTE_/.test(u));
+  const ref = useRef(null);
+  const [scrolled, setScrolled] = useState(false); // ইউজার স্ক্রল শুরু করেছে?
+  const [pageReady, setPageReady] = useState(false); // পেজের নিজের লোড (ছবি/স্ক্রিপ্ট) শেষ?
+  const [near, setNear] = useState(false);         // ওভারলে কাছাকাছি (lookahead-এর ভেতরে)?
+  const [started, setStarted] = useState(false);   // iframe মাউন্ট (লোড শুরু)
+  const [inView, setInView] = useState(false);     // ইউজার এখন দেখছে (≥৫০%)?
+  const [srcIdx, setSrcIdx] = useState(0);
+  const [loaded, setLoaded] = useState(false);
+  const [sec, setSec] = useState(10);
+  const [closed, setClosed] = useState(false);
+
+  // নতুন ভিডিওতে গেলে সব রিসেট
+  useEffect(() => {
+    setScrolled(false); setNear(false); setStarted(false); setInView(false);
+    setSrcIdx(0); setLoaded(false); setSec(10); setClosed(false);
+  }, [resetKey]);
+
+  // ইউজার সত্যিই স্ক্রল শুরু করেছে কিনা (পেজে ঢোকার সাথে সাথে কিছুই লোড হবে না)
+  useEffect(() => {
+    if (scrolled) return;
+    if (window.scrollY > 80) { setScrolled(true); return; }
+    const onScroll = () => { if (window.scrollY > 80) setScrolled(true); };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [scrolled, resetKey]);
+
+  // পেজের নিজের লোড শেষ হওয়ার পরেই অ্যাড লোড শুরু — স্লো নেটওয়ার্কে
+  // ভিডিও/থাম্বনেইলের সাথে অ্যাড পাল্লা দিয়ে সাইট ধীর করবে না
+  useEffect(() => {
+    if (document.readyState === 'complete') { setPageReady(true); return; }
+    const onLoad = () => setPageReady(true);
+    window.addEventListener('load', onLoad);
+    return () => window.removeEventListener('load', onLoad);
+  }, []);
+
+  // কাছাকাছি (এক স্ক্রিন নিচে) + দৃশ্যমান (≥৫০%) ট্র্যাকিং
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || closed || validUrls.length === 0) return;
+    const nearObs = new IntersectionObserver(es => setNear(es[0].isIntersecting), { rootMargin: AD_LOOKAHEAD });
+    const viewObs = new IntersectionObserver(es => setInView(es[0].isIntersecting), { threshold: 0.5 });
+    nearObs.observe(el);
+    viewObs.observe(el);
+    return () => { nearObs.disconnect(); viewObs.disconnect(); };
+  }, [closed, validUrls.length, resetKey]);
+
+  // স্ক্রল শুরু + পেজ লোড শেষ + কাছাকাছি = লোড শুরু (একবারই)।
+  // ইউজারের ডেটা-সেভার মোড চালু থাকলে (নেটওয়ার্ক সাশ্রয়ের অনুরোধ) প্রি-লোড করা হয় না,
+  // তখন ওভারলে ইউজার সত্যিই দেখতে পেলে (inView) তবেই লোড শুরু হবে।
+  useEffect(() => {
+    if (started || !scrolled || !pageReady) return;
+    const saveData = typeof navigator !== 'undefined' && navigator.connection && navigator.connection.saveData;
+    if (saveData ? inView : near) setStarted(true);
+  }, [scrolled, pageReady, near, inView, started]);
+
+  // কাউন্টডাউন — শুধু যতক্ষণ ওভারলে স্ক্রিনে দেখা যাচ্ছে
+  useEffect(() => {
+    if (!started || !inView || sec <= 0) return;
+    const t = setTimeout(() => setSec(n => n - 1), 1000);
+    return () => clearTimeout(t);
+  }, [started, inView, sec]);
+
+  // ✕ আসার ১ সেকেন্ড পর ক্লিক না করলেও নিজে বন্ধ
+  useEffect(() => {
+    if (!started || sec > 0) return;
+    const t = setTimeout(() => setClosed(true), 1000);
+    return () => clearTimeout(t);
+  }, [started, sec]);
+
+  // ফলব্যাক: ৮ সেকেন্ডে onLoad না এলে ব্যাকআপ URL + কাউন্টডাউন রিসেট
+  useEffect(() => {
+    if (!started || loaded || srcIdx >= validUrls.length - 1) return;
+    const t = setTimeout(() => { setSrcIdx(i => i + 1); setSec(10); }, 8000);
+    return () => clearTimeout(t);
+  }, [started, loaded, srcIdx, validUrls.length]);
+
+  if (closed || validUrls.length === 0) return null;
+
+  return (
+    <div ref={ref} className="inline-ad-overlay">
+      {started && (
+        <iframe
+          key={srcIdx}
+          src={validUrls[srcIdx]}
+          title="ad"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
+          onLoad={() => setLoaded(true)}
+          onError={() => { setLoaded(false); setSrcIdx(i => Math.min(i + 1, validUrls.length - 1)); setSec(10); }}
+        />
+      )}
+      {started && (sec > 0 ? (
+        <div className="bottom-ad-badge">{sec}</div>
+      ) : (
+        <button className="bottom-ad-badge bottom-ad-close" onClick={() => setClosed(true)} aria-label="বন্ধ করুন">✕</button>
+      ))}
+    </div>
+  );
+}
+
 function getEmbedUrl(url) {
   if (!url) return '';
   if (url.includes('archive.org/embed/')) return url;
@@ -414,6 +527,18 @@ export default function VideoPage({ video, related: relatedProp, moreVideos, lat
   const BOTTOM_AD2_URLS = [
     'https://auctionr.org/4/16f81a635ac4a7014beccc352651ca6d',   // প্রাইমারি
     'https://auctionr.org/4/5783b3115933158823dfa15f974d08ea',  // ব্যাকআপ (প্রাইমারি কাজ না করলে)
+  ];
+
+  // ── নতুন: স্ক্রলের মাঝের ফোন-স্ক্রিন সাইজ ওভারলে — প্রতিটায় ২টা SmartLink।
+  // প্রথমটা ৮ সেকেন্ডে লোড না হলে দ্বিতীয়টা চলবে। নিচের PASTE_... লেখাগুলো
+  // মুছে আসল লিংক বসান (প্লেসহোল্ডার থাকলে ওভারলে দেখাবে না)। ──
+  const MID_AD_URLS = [
+    'https://auctionr.org/4/97116c3ef978497d7be3df8a68c645c4',   // মাঝের ওভারলে — প্রাইমারি
+    'https://auctionr.org/4/746a6cf12601ceb0c2cad6748875da70',   // মাঝের ওভারলে — ব্যাকআপ
+  ];
+  const END_AD_URLS = [
+    'https://auctionr.org/4/68d8f41b1423fa1813e6a4c2c4b0e7da',   // শেষের ওভারলে — প্রাইমারি
+    'https://auctionr.org/4/a811b5bb9aee92f5f2ba1f94cc7dae81',   // শেষের ওভারলে — ব্যাকআপ
   ];
   const [bottomAdSec, setBottomAdSec] = useState(10);
   useEffect(() => {
@@ -711,41 +836,6 @@ export default function VideoPage({ video, related: relatedProp, moreVideos, lat
       .catch(() => {});
   }, [video.id]);
 
-  // Inject highperformanceformat.com 728x90 banner ads (isolated iframe, runs twice)
-  useEffect(() => {
-    function buildAdIframe(key, width, height) {
-      const iframe = document.createElement('iframe');
-      iframe.style.width = width + 'px';
-      iframe.style.height = height + 'px';
-      iframe.style.maxWidth = '100%';
-      iframe.style.border = '0';
-      iframe.style.overflow = 'hidden';
-      iframe.scrolling = 'no';
-
-      const html = `<!DOCTYPE html><html><head><style>html,body{margin:0;padding:0;overflow:hidden;}</style></head><body>
-<script type="text/javascript">
-atOptions = {
-  'key' : '${key}',
-  'format' : 'iframe',
-  'height' : ${height},
-  'width' : ${width},
-  'params' : {}
-};
-</script>
-<script type="text/javascript" src="https://www.highperformanceformat.com/${key}/invoke.js"></script>
-</body></html>`;
-
-      iframe.srcdoc = html;
-      return iframe;
-    }
-
-    ['ad-banner-mid'].forEach(id => {
-      const container = document.getElementById(id);
-      if (!container || container.dataset.loaded) return;
-      container.dataset.loaded = 'true';
-      container.appendChild(buildAdIframe('408f7fe8d5566eee24a05d83101d2638', 300, 250));
-    });
-  }, [video.id]);
 
   // ── নতুন: related videos-এর প্রথম ১২টার পর profitableratecpmnetwork-এর
   // container-based banner অ্যাড (আগে এখানে highperformanceformat-এর
@@ -935,6 +1025,8 @@ atOptions = {
           .bottom-ad iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000;}
           .bottom-ad-badge{position:absolute;z-index:2;top:10px;right:10px;width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,0.15);color:#fff;font-size:0.95rem;font-weight:700;display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,0.35);}
           .bottom-ad-close{cursor:pointer;font-size:1.05rem;line-height:1;padding:0;}
+          .inline-ad-overlay{position:relative;width:100%;height:100vh;height:100svh;margin:1rem 0;background:#000;overflow:hidden;}
+          .inline-ad-overlay iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000;}
         `}</style>
       </Head>
 
@@ -1069,10 +1161,9 @@ atOptions = {
               </div>
             )}
 
-            {/* 300x250 Banner Ad - below player, above related */}
-            <div style={{display:'flex',justifyContent:'center',margin:'1rem 0'}}>
-              <div className="ad-banner-slot" id="ad-banner-mid"></div>
-            </div>
+            {/* ── মাঝের ওভারলে (আগে এখানে 300x250 ব্যানার ছিল): ফোন-স্ক্রিন সাইজ
+                 জায়গা, ইউজার স্ক্রল শুরু করলে SmartLink লোড শুরু হয় ── */}
+            <InlineAdOverlay urls={MID_AD_URLS} resetKey={video.id} />
 
             {/* ── লেটেস্ট ভিডিও: মাঝের ব্যানার অ্যাডের ঠিক নিচে, Related Videos-এর
                  আলাদা, সাইটের সবচেয়ে নতুন ভিডিওগুলো — ভিডিও বদলালে এটাও বদলে যায় ── */}
@@ -1253,6 +1344,9 @@ atOptions = {
 
         {/* ── ৪০টা (বা যত আছে) related ভিডিও লোড শেষ হলে, সবার নিচে
              ওপরের ব্যানার এডের একটা কপি আবার বসানো হচ্ছে। ── */}
+        {/* ── শেষের ওভারলে: সব related ভিডিও লোড শেষ হলে লিস্টের একদম শেষে বসে ── */}
+        {!hasMoreToLoad && <InlineAdOverlay urls={END_AD_URLS} resetKey={video.id} />}
+
         {!hasMoreToLoad && (
           <div style={{display:'flex',justifyContent:'center',margin:'1rem 0'}} id="native-banner-related-bottom"></div>
         )}
