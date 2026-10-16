@@ -156,7 +156,7 @@ function getUniqueSlugs(rows, slugifyFn) {
 // urls-এ 'PASTE_' দিয়ে শুরু করা প্লেসহোল্ডার থাকলে ওভারলে দেখাবেই না। ──
 const AD_LOOKAHEAD = '0px 0px 100% 0px'; // স্ক্রিনের নিচে কতটা আগে থেকে লোড শুরু (100% = ১ স্ক্রিন)
 
-function InlineAdOverlay({ urls, resetKey }) {
+function InlineAdOverlay({ urls, resetKey, seconds = 10, afterCloseVh = 0 }) {
   const validUrls = (urls || []).filter(u => u && !/^PASTE_/.test(u));
   const ref = useRef(null);
   const [scrolled, setScrolled] = useState(false); // ইউজার স্ক্রল শুরু করেছে?
@@ -166,13 +166,13 @@ function InlineAdOverlay({ urls, resetKey }) {
   const [inView, setInView] = useState(false);     // ইউজার এখন দেখছে (≥৫০%)?
   const [srcIdx, setSrcIdx] = useState(0);
   const [loaded, setLoaded] = useState(false);
-  const [sec, setSec] = useState(10);
+  const [sec, setSec] = useState(seconds);
   const [closed, setClosed] = useState(false);
 
   // নতুন ভিডিওতে গেলে সব রিসেট
   useEffect(() => {
     setScrolled(false); setNear(false); setStarted(false); setInView(false);
-    setSrcIdx(0); setLoaded(false); setSec(10); setClosed(false);
+    setSrcIdx(0); setLoaded(false); setSec(seconds); setClosed(false);
   }, [resetKey]);
 
   // ইউজার সত্যিই স্ক্রল শুরু করেছে কিনা (পেজে ঢোকার সাথে সাথে কিছুই লোড হবে না)
@@ -230,25 +230,27 @@ function InlineAdOverlay({ urls, resetKey }) {
   // ফলব্যাক: ৮ সেকেন্ডে onLoad না এলে ব্যাকআপ URL + কাউন্টডাউন রিসেট
   useEffect(() => {
     if (!started || loaded || srcIdx >= validUrls.length - 1) return;
-    const t = setTimeout(() => { setSrcIdx(i => i + 1); setSec(10); }, 8000);
+    const t = setTimeout(() => { setSrcIdx(i => i + 1); setSec(seconds); }, 8000);
     return () => clearTimeout(t);
   }, [started, loaded, srcIdx, validUrls.length]);
 
-  if (closed || validUrls.length === 0) return null;
+  if (validUrls.length === 0) return null;
+  if (closed && !afterCloseVh) return null;
 
+  // ওভারলে চলে যাওয়ার পর afterCloseVh (স্ক্রিনের % উচ্চতা) পরিমাণ কালো জায়গা থেকে যায়
   return (
-    <div ref={ref} className="inline-ad-overlay">
-      {started && (
+    <div ref={ref} className="inline-ad-overlay" style={closed ? { height: afterCloseVh + 'vh' } : undefined}>
+      {!closed && started && (
         <iframe
           key={srcIdx}
           src={validUrls[srcIdx]}
           title="ad"
           sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
           onLoad={() => setLoaded(true)}
-          onError={() => { setLoaded(false); setSrcIdx(i => Math.min(i + 1, validUrls.length - 1)); setSec(10); }}
+          onError={() => { setLoaded(false); setSrcIdx(i => Math.min(i + 1, validUrls.length - 1)); setSec(seconds); }}
         />
       )}
-      {started && (sec > 0 ? (
+      {!closed && started && (sec > 0 ? (
         <div className="bottom-ad-badge">{sec}</div>
       ) : (
         <button className="bottom-ad-badge bottom-ad-close" onClick={() => setClosed(true)} aria-label="বন্ধ করুন">✕</button>
@@ -1045,7 +1047,7 @@ atOptions = {
           .bottom-ad iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000;}
           .bottom-ad-badge{position:absolute;z-index:2;top:10px;right:10px;width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,0.15);color:#fff;font-size:0.95rem;font-weight:700;display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,0.35);}
           .bottom-ad-close{cursor:pointer;font-size:1.05rem;line-height:1;padding:0;}
-          .inline-ad-overlay{position:relative;width:100%;height:100vh;margin:1rem 0;background:#000;overflow:hidden;}
+          .inline-ad-overlay{position:relative;width:100%;height:100vh;margin:1rem 0;background:#000;overflow:hidden;transition:height .4s ease;}
           .inline-ad-overlay iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000;}
         `}</style>
       </Head>
@@ -1315,7 +1317,7 @@ atOptions = {
 
         {/* ── মাঝের ওভারলে: related ভিডিওর প্রথম ব্যাচ আর ইনফিনিট-স্ক্রলের
              মাঝখানে (আগে এখানে profitableratecpmnetwork ব্যানার ছিল) ── */}
-        <InlineAdOverlay urls={MID_AD_URLS} resetKey={video.id} />
+        <InlineAdOverlay urls={MID_AD_URLS} resetKey={video.id} seconds={3} afterCloseVh={50} />
 
         {/* ── Infinite scroll: ইউজার স্ক্রল করলে ধীরে ধীরে
              আরও related videos লোড হয়ে এখানে দেখানো হবে ── */}
@@ -1368,7 +1370,7 @@ atOptions = {
         {/* ── ৪০টা (বা যত আছে) related ভিডিও লোড শেষ হলে, সবার নিচে
              ওপরের ব্যানার এডের একটা কপি আবার বসানো হচ্ছে। ── */}
         {/* ── শেষের ওভারলে: সব related ভিডিও লোড শেষ হলে লিস্টের একদম শেষে বসে ── */}
-        {!hasMoreToLoad && <InlineAdOverlay urls={END_AD_URLS} resetKey={video.id} />}
+        {!hasMoreToLoad && <InlineAdOverlay urls={END_AD_URLS} resetKey={video.id} seconds={3} />}
 
         {!hasMoreToLoad && (
           <div style={{display:'flex',justifyContent:'center',margin:'1rem 0'}} id="native-banner-related-bottom"></div>
