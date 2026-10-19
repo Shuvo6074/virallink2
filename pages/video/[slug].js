@@ -534,10 +534,6 @@ export default function VideoPage({ video, related: relatedProp, moreVideos, lat
   // ── নতুন: স্ক্রলের মাঝের ফোন-স্ক্রিন সাইজ ওভারলে — প্রতিটায় ২টা SmartLink।
   // প্রথমটা ৮ সেকেন্ডে লোড না হলে দ্বিতীয়টা চলবে। নিচের PASTE_... লেখাগুলো
   // মুছে আসল লিংক বসান (প্লেসহোল্ডার থাকলে ওভারলে দেখাবে না)। ──
-  const MID_AD_URLS = [
-    'https://auctionr.org/4/97116c3ef978497d7be3df8a68c645c4',   // মাঝের ওভারলে — প্রাইমারি
-    'https://auctionr.org/4/746a6cf12601ceb0c2cad6748875da70',   // মাঝের ওভারলে — ব্যাকআপ
-  ];
   const END_AD_URLS = [
     'https://auctionr.org/4/68d8f41b1423fa1813e6a4c2c4b0e7da',   // শেষের ওভারলে — প্রাইমারি
     'https://auctionr.org/4/a811b5bb9aee92f5f2ba1f94cc7dae81',   // শেষের ওভারলে — ব্যাকআপ
@@ -875,6 +871,23 @@ atOptions = {
     });
   }, [video.id]);
 
+
+  // ── নতুন: related videos-এর প্রথম ১২টার পর profitableratecpmnetwork-এর
+  // container-based banner অ্যাড (আগে এখানে highperformanceformat-এর
+  // 728x90 ছিল, সেটার বদলে এই নতুনটা বসানো হলো)। ইউজারের দেওয়া কোডে
+  // script আর div sibling হিসেবে ছিল, তাই এখানেও script-টা container
+  // div-এর ঠিক আগে বসানো হচ্ছে যাতে নেটওয়ার্কের নিজস্ব লজিক ঠিকভাবে
+  // ওই div-টাকেই খুঁজে পায়। ──
+  useEffect(() => {
+    const el = document.getElementById('container-e474628fdcec06f52100e0b84b3fa759');
+    if (!el || el.dataset.loaded) return;
+    el.dataset.loaded = 'true';
+    const script = document.createElement('script');
+    script.src = 'https://pl30569233.profitableratecpmnetwork.com/e474628fdcec06f52100e0b84b3fa759/invoke.js';
+    script.async = true;
+    script.setAttribute('data-cfasync', 'false');
+    el.parentNode.insertBefore(script, el);
+  }, [video.id]);
 
   // ── নতুন: ওপরের ব্যানার অ্যাডের (২c6dbe...) হুবহু কপি — related videos
   // এর ৪০টাই (বা যত আছে) লোড হয়ে শেষ হলে (hasMoreToLoad = false) সবার
@@ -1315,9 +1328,7 @@ atOptions = {
           </div>
         </div>
 
-        {/* ── মাঝের ওভারলে: related ভিডিওর প্রথম ব্যাচ আর ইনফিনিট-স্ক্রলের
-             মাঝখানে (আগে এখানে profitableratecpmnetwork ব্যানার ছিল) ── */}
-        <InlineAdOverlay urls={MID_AD_URLS} resetKey={video.id} seconds={3} afterCloseVh={50} />
+        <div id="container-e474628fdcec06f52100e0b84b3fa759"></div>
 
         {/* ── Infinite scroll: ইউজার স্ক্রল করলে ধীরে ধীরে
              আরও related videos লোড হয়ে এখানে দেখানো হবে ── */}
