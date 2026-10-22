@@ -137,7 +137,7 @@ function getUniqueSlugs(rows, slugifyFn) {
   const counts = {};
   return rows.map(row => {
     const frozen = (row.c[8]?.v || '').toString().trim();
-    if (frozen) return frozen;
+    if (frozen) return frozen.replace(/\s+/g, '-');
     const base = slugifyFn(row.c[0]?.v || 'video');
     counts[base] = (counts[base] || 0) + 1;
     return counts[base] > 1 ? `${base}-${counts[base]}` : base;
@@ -329,8 +329,13 @@ export async function getServerSideProps({ params, query, res: httpRes }) {
     const rows = await getSheetRows();
     const allVideos = buildAllVideos(rows);
 
-    const video = allVideos.find(v => v.slug === params.slug);
+    const norm = s => String(s).trim().replace(/\s+/g, '-');
+    const video = allVideos.find(v => v.slug === params.slug)
+               || allVideos.find(v => v.slug === norm(params.slug));
     if (!video) return { notFound: true };
+    if (video.slug !== params.slug) {
+      return { redirect: { destination: `/video/${encodeURIComponent(video.slug)}`, permanent: true } };
+    }
 
     // ── ?autoplay=1 ট্যাব: লিস্টগুলো প্রথম ট্যাব থেকেই আসবে (নিচে দেখুন),
     // তাই সার্ভার আবার Latest/Related/More বানাবে না। ──
@@ -397,6 +402,7 @@ export async function getServerSideProps({ params, query, res: httpRes }) {
 
     return { props: { video, related, moreVideos, latestVideos } };
   } catch(e) {
+    httpRes.setHeader('Cache-Control', 'no-store');
     return { notFound: true };
   }
 }
@@ -933,11 +939,16 @@ atOptions = {
   }
 
   function shareVideo() {
-    const url = `${SITE_URL}/video/${video.slug}`;
+    const url = `${SITE_URL}/video/${encodeURIComponent(video.slug)}`;
     if (typeof navigator !== 'undefined' && navigator.share) {
-      navigator.share({ title: video.title + ' | ViralLink BD', url });
-    } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard.writeText(url).then(() => alert('লিংক কপি হয়েছে!'));
+      navigator.share({ title: video.title + ' | ViralLink BD', url }).catch(() => {});
+      return;
+    }
+    const manual = () => prompt('লিংকটা কপি করুন:', url);
+    if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(() => alert('লিংক কপি হয়েছে!')).catch(manual);
+    } else {
+      manual();
     }
   }
 
