@@ -59,7 +59,7 @@ function getUniqueSlugs(rows) {
   const counts = {};
   return rows.map(row => {
     const frozen = (row.c[8]?.v || '').toString().trim();
-    if (frozen) return frozen;
+    if (frozen) return frozen.replace(/\s+/g, '-');
     const base = slugify(row.c[0]?.v || 'video');
     counts[base] = (counts[base] || 0) + 1;
     return counts[base] > 1 ? `${base}-${counts[base]}` : base;
