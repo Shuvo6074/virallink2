@@ -35,7 +35,7 @@ export async function getServerSideProps({ res }) {
       const frozen = (row.c[8]?.v || '').toString().trim();
       let slug;
       if (frozen) {
-        slug = frozen;
+        slug = frozen.replace(/\s+/g, '-');
       } else {
         const baseSlug = slugify(title);
         slugCounts[baseSlug] = (slugCounts[baseSlug] || 0) + 1;
