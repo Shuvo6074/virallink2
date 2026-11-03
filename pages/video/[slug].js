@@ -84,10 +84,9 @@ function timeAgo(dateStr) {
   return `${diffYr} year${diffYr === 1 ? '' : 's'} ago`;
 }
 
-// ── নতুন: schema.org VideoObject-এর uploadDate ফিল্ডের জন্য পুরো ISO 8601
+// ── schema.org VideoObject-এর uploadDate ফিল্ডের জন্য পুরো ISO 8601
 // ফরম্যাট (সময় + timezone সহ) বানায়, যেমন "2026-07-29T00:00:00+06:00"।
-// GSC "missing a time zone" warning ঠিক করতে এটা যোগ করা হলো — Bangladesh
-// সবসময় UTC+6 (কোনো DST নেই), তাই অফসেট ফিক্সড রাখা নিরাপদ। ──
+// Bangladesh সবসময় UTC+6 (কোনো DST নেই), তাই অফসেট ফিক্সড রাখা নিরাপদ। ──
 function formatIso8601BD(date) {
   const pad = n => String(n).padStart(2, '0');
   const y = date.getFullYear();
@@ -96,10 +95,8 @@ function formatIso8601BD(date) {
   return `${y}-${mo}-${d}T00:00:00+06:00`;
 }
 
-// ── থাম্বনেইল ফিক্স (আপডেট): index.js-এর মতোই — postimg.cc লিংকের জন্য
-// প্রক্সি বাদ দিয়ে সরাসরি URL ব্যবহার করা হচ্ছে, কারণ wsrv.nl একসাথে
-// অনেক রিকোয়েস্ট পেলে rate-limit/timeout করে ফেলছিল (প্রথমবার কালো
-// থাম্বনেইল, রিলোডে ঠিক হওয়ার কারণ এটাই)। ──
+// ── থাম্বনেইল: postimg.cc লিংকের জন্য প্রক্সি বাদ দিয়ে সরাসরি URL ব্যবহার হচ্ছে,
+// কারণ wsrv.nl একসাথে অনেক রিকোয়েস্ট পেলে rate-limit/timeout করে ফেলছিল। ──
 function thumbUrl(url, width, quality = 78) {
   if (!url) return url;
   if (url.includes('postimg.cc')) return url;
@@ -117,11 +114,8 @@ function parseCategories(str) {
   return arr.length ? arr : ['General'];
 }
 
-// ── নতুন: SEO ট্যাগ সিস্টেম। Sheet-এর কলাম J (index 9)-এ কমা দিয়ে
-// আলাদা করা ট্যাগ লেখা যাবে, যেমন: "bangladesh new xxx, viral link video".
-// এগুলো ভিডিও পেজের নিচে ক্লিকযোগ্য বাটন হিসেবে দেখাবে এবং প্রতিটা
-// /tag/[tag-slug] নামে একটা আলাদা archive পেজে নিয়ে যাবে। এই ফিচার
-// সম্পূর্ণ স্বাধীন — slug/URL generation-এর কোনো লজিক স্পর্শ করে না। ──
+// ── SEO ট্যাগ সিস্টেম। Sheet-এর কলাম J (index 9)-এ কমা দিয়ে আলাদা করা ট্যাগ লেখা যাবে।
+// প্রতিটা /tag/[tag-slug] নামে আলাদা archive পেজে নিয়ে যাবে। ──
 function parseTags(str) {
   return (str || '').split(',').map(s => s.trim()).filter(Boolean);
 }
@@ -144,13 +138,10 @@ function getUniqueSlugs(rows, slugifyFn) {
   });
 }
 
-// ── প্লেয়ার পেজের অ্যাড (দুই জায়গায়, প্রতিটা একবার করে):
-// ১) প্লেয়ারের ওপর অদৃশ্য overlay: প্রথম ক্লিকে লিংক নতুন ট্যাবে খোলে, overlay সরে যায়, এরপর প্লেয়ার স্বাভাবিক।
-// ২) প্লেয়ারের বাইরে বাকি পেজ (related ভিডিও, বাটন ইত্যাদি): প্রথম ক্লিকে লিংক নতুন ট্যাবে খোলে
-//    (সেই ক্লিকের স্বাভাবিক কাজ হয় না), এরপর সব স্বাভাবিক।
-// বন্ধ করতে নিচে true-এর জায়গায় false করুন। ──
-const ENABLE_PLAYER_CLICK_AD = true;
-const PLAYER_AD_URL = 'https://certainlywhen.com?3zt2S=1731611';
+// ── পুরনো প্লেয়ার ক্লিক-অ্যাড (overlay + বাইরে প্রথম ক্লিক) এখন বন্ধ।
+// তার বদলে নিচে HilltopAds Popunder script ব্যবহার হচ্ছে। ──
+const ENABLE_PLAYER_CLICK_AD = false;
+const PLAYER_AD_URL = '';
 
 function getEmbedUrl(url) {
   if (!url) return '';
@@ -165,12 +156,10 @@ function getEmbedUrl(url) {
   return url;
 }
 
-// ── নতুন: Sheet-এর "hls_url" কলামে (column H, index 7) হয় পুরো R2 লিংক
-// (যেমন https://pub-xxxx.r2.dev/videos/slug/master.m3u8) অথবা শুধু
-// path অংশ (videos/slug/master.m3u8) বসানো যাবে — দুটোই কাজ করবে।
-// এই ফাংশন যেকোনো ফরম্যাট থেকে শুধু path অংশটুকু বের করে আনে, যাতে
-// সেটা /api/video/<path> প্রোটেক্টেড প্রক্সি রুটে পাঠানো যায় (আসল R2
-// লিংক ব্রাউজারে কখনো প্রকাশ হয় না)। ──
+// ── Sheet-এর "hls_url" কলামে (column H, index 7) হয় পুরো R2 লিংক
+// অথবা শুধু path অংশ বসানো যাবে — দুটোই কাজ করবে।
+// এই ফাংশন শুধু path অংশটুকু বের করে আনে, যাতে সেটা /api/video/<path>
+// প্রোটেক্টেড প্রক্সি রুটে পাঠানো যায়। ──
 function getHlsProxyPath(raw) {
   if (!raw) return '';
   const trimmed = raw.trim();
@@ -182,9 +171,8 @@ function getHlsProxyPath(raw) {
   }
 }
 
-// ── CPU কমানোর ফিক্স: পুরো Sheet থেকে allVideos বানানো (map/filter/reverse/slug)
-// আগে প্রতিটা রিকোয়েস্টে হতো। getSheetRows() ৩০ সেকেন্ড একই rows array
-// ফেরত দেয়, তাই array একই থাকলে আগের হিসাব করা ফলাফলই ব্যবহার হবে। ──
+// ── CPU কমানোর ফিক্স: getSheetRows() ৩০ সেকেন্ড একই rows array ফেরত দেয়,
+// তাই array একই থাকলে আগের হিসাব করা ফলাফলই ব্যবহার হবে। ──
 let _allRows = null;
 let _allVideos = null;
 function buildAllVideos(rows) {
@@ -200,8 +188,8 @@ function buildAllVideos(rows) {
       date:        row.c[4]?.v || '',
       duration:    row.c[5]?.v || '',
       description: row.c[6]?.v || '',
-      hlsPath:     getHlsProxyPath(row.c[7]?.v || ''), // ── নতুন কলাম H: hls_url ──
-      tags:        parseTags(row.c[9]?.v || ''), // ── নতুন কলাম J: Tags ──
+      hlsPath:     getHlsProxyPath(row.c[7]?.v || ''), // ── কলাম H: hls_url ──
+      tags:        parseTags(row.c[9]?.v || ''), // ── কলাম J: Tags ──
       slug:        uniqueSlugs[i]
     })).filter(v => v.title !== 'Title').reverse()
       .map((v, idx) => ({ ...v, pageBatch: Math.floor(idx / PER_PAGE) + 1 }));
@@ -211,11 +199,7 @@ function buildAllVideos(rows) {
 }
 
 export async function getServerSideProps({ params, query, res: httpRes }) {
-  // ── পারফরম্যান্স ফিক্স: index.js-এর মতোই এই পেজও Edge-এ ৬০ সেকেন্ড
-  // cache হবে, দ্বিতীয়বার একই ভিডিও পেজে কেউ গেলে সাথে সাথে লোড হবে। ──
-  // ── রিকোয়েস্ট কমানোর ফিক্স: index.js-এর সাথে consistent, 60s থেকে
-  // 900s (15 মিনিট) করা হলো — একই ভিডিও পেজ বারবার visitor দেখলে Worker
-  // প্রতিবার Sheet fetch করবে না, Cloudflare edge cache থেকেই সার্ভ হবে। ──
+  // ── রিকোয়েস্ট কমানোর ফিক্স: 900s (15 মিনিট) Edge cache + stale-while-revalidate ──
   httpRes.setHeader('Cache-Control', 'public, s-maxage=900, stale-while-revalidate=1800');
 
   try {
@@ -230,25 +214,17 @@ export async function getServerSideProps({ params, query, res: httpRes }) {
       return { redirect: { destination: `/video/${encodeURIComponent(video.slug)}`, permanent: true } };
     }
 
-    // ── ?autoplay=1 ট্যাব: লিস্টগুলো প্রথম ট্যাব থেকেই আসবে (নিচে দেখুন),
-    // তাই সার্ভার আবার Latest/Related/More বানাবে না। ──
+    // ── ?autoplay=1 ট্যাব: লিস্টগুলো প্রথম ট্যাব থেকেই আসবে, তাই সার্ভার আবার বানাবে না। ──
     if (query && query.autoplay === '1') {
       return { props: { video, related: [], moreVideos: [], latestVideos: [] } };
     }
 
-    // ── Related videos (আপডেট): শুধু এই ভিডিওর নিজের ক্যাটাগরি না, বরং
-    // সাইটের সব ক্যাটাগরি থেকেই কিছু কিছু ভিডিও মিক্স করে দেখানো হচ্ছে।
-    // প্রথমে এই ভিডিওর নিজের ক্যাটাগরি(গুলো) থেকে ৫টা করে (সবচেয়ে বেশি
-    // প্রাসঙ্গিক বলে আগে রাখা হলো), তারপর সাইটের বাকি সব ক্যাটাগরি থেকেও
-    // ৫টা করে ভিডিও যোগ করা হচ্ছে, আর শেষে একই batch/page থেকে ২-৩টা। ──
+    // ── Related videos: এই ভিডিওর নিজের ক্যাটাগরি থেকে ৫টা করে, তারপর
+    // সাইটের বাকি সব ক্যাটাগরি থেকেও ৫টা করে, আর শেষে একই batch/page থেকে ২-৩টা। ──
     const usedIds = new Set([video.id]);
     const relatedVideos = [];
 
-    // ── বাগ ফিক্স: আগে ভিডিওটা যে ক্যাটাগরিতে নেই সেখানে selfIdx = -1 হওয়ায়
-    // offset সবসময় 0 হতো, তাই অন্য ক্যাটাগরির সেই একই প্রথম ৫টা বারবার আসত।
-    // আর নিজের ক্যাটাগরিতেও শুধু ১ ঘর সরত, ফলে ৪টা ভিডিও একই থাকত। এখন
-    // প্রতিটা ক্যাটাগরির পুরো লিস্ট থেকে (শুরু/মাঝ/শেষ — যেকোনো জায়গা থেকে)
-    // random ৫টা বাছা হচ্ছে, তাই ভিডিও বদলালে related-ও বদলে যাবে। ──
+    // প্রতিটা ক্যাটাগরির পুরো লিস্ট থেকে random ৫টা বাছা হচ্ছে, তাই ভিডিও বদলালে related-ও বদলে যাবে।
     function pickRotated(cat, count) {
       const pool = allVideos.filter(v => v.categories.includes(cat) && !usedIds.has(v.id));
       for (let i = pool.length - 1; i > 0; i--) {
@@ -274,22 +250,11 @@ export async function getServerSideProps({ params, query, res: httpRes }) {
     batchRelated.forEach(v => usedIds.add(v.id));
     const related = [...relatedVideos, ...batchRelated].slice(0, 40);
 
-    // ── Infinite scroll pool (নতুন): related-এর ৪০টা শেষ হয়ে গেলেও যাতে
-    // স্ক্রল করলে আরও ভিডিও আসতে থাকে, তাই সাইটের বাকি সব ভিডিও (যেগুলো
-    // এখনও related-এ নেই) এখানে আলাদা করে রাখা হলো। পেলোড ছোট রাখতে শুধু
-    // প্রয়োজনীয় ফিল্ডগুলোই (lean object) পাঠানো হচ্ছে। সাইটে যত ভিডিও
-    // থাকুক না কেন (কয়েকশো/হাজার), এটাই ব্যবহার হবে "আরও ভিডিও" সেকশনে। ──
+    // moreVideos কম্পোনেন্টে ব্যবহার হয় না, তাই খালি পাঠানো হচ্ছে (পেলোড ছোট রাখতে)।
     const leanify = v => ({ id: v.id, title: v.title, thumbnail: v.thumbnail, categories: v.categories, date: v.date, slug: v.slug, duration: v.duration });
-    // পারফরম্যান্স: moreVideos কম্পোনেন্টে কোথাও ব্যবহার হয় না, অথচ হাজার ভিডিওর
-    // লিস্ট প্রতিটা পেজের HTML-এ (__NEXT_DATA__) ঢুকে যাচ্ছিল — তাই খালি পাঠানো হচ্ছে।
     const moreVideos = [];
 
-    // ── ফিক্স: Latest Videos এখন related-এর সাথে কী বাদ পড়ল তার ওপর
-    // নির্ভর করে না — allVideos (নতুন থেকে পুরোনো সাজানো) থেকে সরাসরি
-    // সবচেয়ে নতুন ভিডিওগুলো নেওয়া হচ্ছে। আগে related-loop অনেক নতুন
-    // ভিডিও (ক্যাটাগরি মিলে যাওয়ায়) আগেই ব্যবহার করে ফেলত, তাই Latest
-    // Videos-এ সেগুলো আর থাকত না — ৪-৫ দিন আগের ভিডিও বাদ পড়ে ১০-১৫
-    // দিন আগেরগুলো দেখাত। এখন সেটা আর হবে না। ──
+    // ── Latest Videos: allVideos (নতুন থেকে পুরোনো) থেকে সরাসরি সবচেয়ে নতুনগুলো ──
     const LATEST_VIDEOS_COUNT = 12;
     const latestVideos = allVideos.filter(v => v.id !== video.id).slice(0, LATEST_VIDEOS_COUNT).map(leanify);
 
@@ -300,12 +265,9 @@ export async function getServerSideProps({ params, query, res: httpRes }) {
   }
 }
 
-// ── নতুন: নিজস্ব R2 (Cloudflare) থেকে আসা ভিডিওর জন্য ইউনিভার্সাল কাস্টম
-// প্লেয়ার — এই একটা কম্পোনেন্টই .m3u8 (HLS) এবং .mp4/.webm/.mov দুই ধরনের
-// ফাইলই চেনে ও চালায়, তাই Sheet-এর hls_url কলামে যেকোনো একটা ফরম্যাট
-// বসালেই চলবে (আলাদা কনভার্সনের দরকার নেই, চাইলে HLS-ও করা যায়)।
-// - .m3u8 হলে: hls.js (CDN থেকে লোড, npm ইনস্টলের দরকার নেই) দিয়ে চলে;
-//   Safari-তে native HLS সাপোর্ট থাকায় সেখানে hls.js লাগে না।
+// ── নিজস্ব R2 (Cloudflare) থেকে আসা ভিডিওর জন্য ইউনিভার্সাল কাস্টম প্লেয়ার —
+// .m3u8 (HLS) এবং .mp4/.webm/.mov দুই ধরনের ফাইলই চেনে ও চালায়।
+// - .m3u8 হলে: hls.js (CDN থেকে লোড) দিয়ে চলে; Safari-তে native HLS।
 // - .mp4/.webm/.mov হলে: সাধারণ <video><source> দিয়ে সরাসরি চলে। ──
 function ProtectedPlayer({ src }) {
   const videoRef = useRef(null);
@@ -360,8 +322,7 @@ function ProtectedPlayer({ src }) {
 export default function VideoPage({ video, related: relatedProp, moreVideos, latestVideos: latestProp }) {
   const router = useRouter();
   // ── ?autoplay=1 ট্যাবে লিস্ট সার্ভার থেকে আবার আনা হয় না; প্রথম ট্যাব
-  // ওভারলে ক্লিকের সময় লিস্টটা localStorage-এ রেখে যায়, এখানে সেটাই দেখানো হয়
-  // (তাই দুই ট্যাবে একই ভিডিও, কিছু বদলায়নি মনে হবে)। ──
+  // ওভারলে ক্লিকের সময় লিস্টটা localStorage-এ রেখে যায়, এখানে সেটাই দেখানো হয়। ──
   const [passedLists, setPassedLists] = useState(null);
   useEffect(() => {
     if (router.query.autoplay !== '1') return;
@@ -377,8 +338,8 @@ export default function VideoPage({ video, related: relatedProp, moreVideos, lat
   const related = passedLists ? passedLists.related : relatedProp;
   const latestVideos = passedLists ? passedLists.latestVideos : latestProp;
   const [likes, setLikes] = useState({});
-  // ── নেট স্পিড ডিটেকশন: প্রথমে 'normal' (SSR/প্রথম paint-এ hydration mismatch
-  // এড়াতে), mount-এর পর আসল অবস্থা (slow/normal/fast) অনুযায়ী state বদলায় ──
+  // ── নেট স্পিড ডিটেকশন: প্রথমে 'normal' (hydration mismatch এড়াতে),
+  // mount-এর পর আসল অবস্থা (slow/normal/fast) অনুযায়ী state বদলায় ──
   const [netTier, setNetTier] = useState('normal'); // 'slow' | 'normal' | 'fast'
   useEffect(() => {
     try {
@@ -398,8 +359,7 @@ export default function VideoPage({ video, related: relatedProp, moreVideos, lat
       return () => conn.removeEventListener && conn.removeEventListener('change', check);
     } catch (e) {}
   }, []);
-  // স্লো নেটে ছোট সাইজ+কম quality, ফাস্ট নেটে সাইজ+quality বাড়িয়ে একদম
-  // ক্লিয়ার/শার্প থাম্বনেইল সরাসরি দেখানো হয় ──
+  // স্লো নেটে ছোট সাইজ+কম quality, ফাস্ট নেটে সাইজ+quality বাড়িয়ে শার্প থাম্বনেইল ──
   const adaptiveThumb = (url, width) => {
     if (netTier === 'slow') return thumbUrl(url, Math.round(width * 0.55), 55);
     if (netTier === 'fast') return thumbUrl(url, Math.round(width * 1.25), 82);
@@ -411,13 +371,13 @@ export default function VideoPage({ video, related: relatedProp, moreVideos, lat
 
   const [iframeStarted, setIframeStarted] = useState(false); // Google Drive/archive.org embed-এর ক্ষেত্রে থাম্বনেইলে ক্লিক করার আগ পর্যন্ত iframe লোড হবে না
 
-  // প্লেয়ার overlay-র নিজস্ব ক্লিক (একবারই, কারণ ক্লিকের পর overlay সরে যায়)
+  // প্লেয়ার overlay-র নিজস্ব ক্লিক (ENABLE_PLAYER_CLICK_AD বন্ধ থাকলে এটা কখনো চলে না)
   function handleOverlayClick() {
     window.open(PLAYER_AD_URL, '_blank');
     setShowOverlay(false);
   }
 
-  // প্লেয়ারের বাইরের অংশে প্রথম ক্লিক
+  // প্লেয়ারের বাইরের অংশে প্রথম ক্লিক (ENABLE_PLAYER_CLICK_AD বন্ধ থাকলে কিছুই করে না)
   useEffect(() => {
     if (!ENABLE_PLAYER_CLICK_AD) return;
     function onFirstClick(e) {
@@ -431,11 +391,18 @@ export default function VideoPage({ video, related: relatedProp, moreVideos, lat
     return () => document.removeEventListener('click', onFirstClick, true);
   }, [video.slug]);
 
-  // ── নতুন: overlay ক্লিক করলে যে নতুন ট্যাব খোলে (একই ভিডিও পেজের কপি,
-  // reverse-tab ট্রিকের অংশ হিসেবে), সেই ট্যাবে যেন আবার overlay দেখিয়ে
-  // দ্বিতীয়বার ক্লিক না চায় (তাহলে অ্যাড আবার ফায়ার হয়ে যেত) — তাই URL-এ
-  // ?autoplay=1 প্যারাম থাকলে overlay সরাসরি স্কিপ করে ভিডিও/iframe সাথে
-  // সাথেই চালু হয়ে যাবে ──
+  // ── Popunder script (HilltopAds) ──
+  useEffect(() => {
+    const s = document.createElement('script');
+    s.settings = {};
+    s.src = '//infamous-maximum.com/c/D.9H6pbI2y5LljS/WYQY9AN/z/Ul5GMcjTQ/4EM-Sa0T3KN/TwkYynN-DFgC1P';
+    s.async = true;
+    s.referrerPolicy = 'no-referrer-when-downgrade';
+    document.body.appendChild(s);
+    return () => { if (s.parentNode) s.parentNode.removeChild(s); };
+  }, []);
+
+  // ── URL-এ ?autoplay=1 প্যারাম থাকলে overlay স্কিপ করে ভিডিও/iframe সাথে সাথেই চালু হয় ──
   useEffect(() => {
     if (router.query.autoplay === '1') {
       setShowOverlay(false);
@@ -443,21 +410,14 @@ export default function VideoPage({ video, related: relatedProp, moreVideos, lat
     }
   }, [router.query.autoplay]);
 
-  // ── Infinite scroll (নতুন): শুরুতে related videos-এর প্রথম ১২টাই দেখানো হয়
-  // (related-mobile / desktop sidebar-এ)। ব্যানার অ্যাডের নিচে ইউজার স্ক্রল
-  // করলে ধীরে ধীরে (৮টা করে ব্যাচে) বাকি ভিডিওগুলো লোড হবে — একসাথে সব
-  // (৪০টা পর্যন্ত) লোড না করে পারফরম্যান্সের জন্য এই পদ্ধতি ──
+  // ── Infinite scroll: শুরুতে related videos-এর প্রথম ১২টা দেখানো হয়,
+  // স্ক্রল করলে ৮টা করে ব্যাচে বাকিগুলো লোড হয় (সর্বোচ্চ ৪০টা) ──
   const INITIAL_RELATED_SHOW = 12;
   const LOAD_CHUNK = 8;
   const [extraCount, setExtraCount] = useState(0);
   const loadMoreRef = useRef(null);
 
   const initialRelated = related.slice(0, INITIAL_RELATED_SHOW);
-  // latestVideos এখন সরাসরি getServerSideProps থেকে আসা prop — সবচেয়ে
-  // নতুন আপলোড হওয়া ভিডিও, related-এ কী আছে তার সাথে সম্পর্কহীন।
-  // ── আপডেট: infiniteScrollPool এখন শুধু related-এর বাকি অংশ (১২-৪০), মোট
-  // সর্বোচ্চ ৪০টা ভিডিও দেখাবে (moreVideos আর যোগ হচ্ছে না) — ৪০ শেষ হলে
-  // স্ক্রল থেমে যাবে এবং নিচে ব্যানার এড দেখাবে। ──
   const infiniteScrollPool = related.slice(INITIAL_RELATED_SHOW);
   const extraRelated = infiniteScrollPool.slice(0, extraCount);
   const hasMoreToLoad = extraCount < infiniteScrollPool.length;
@@ -486,16 +446,12 @@ export default function VideoPage({ video, related: relatedProp, moreVideos, lat
     }
   }
 
-  // ── নতুন ভিডিও পেজে গেলে (video.id বদলালে) infinite-scroll কাউন্টার
-  // রিসেট হবে, নাহলে আগের পেজের লোড হওয়া কাউন্ট থেকেই যেত ──
+  // ── নতুন ভিডিও পেজে গেলে (video.id বদলালে) infinite-scroll কাউন্টার রিসেট ──
   useEffect(() => {
     setExtraCount(0);
   }, [video.id]);
 
-  // ── ব্যানার অ্যাডের নিচে থাকা সেন্টিনেল এলিমেন্ট viewport-এ এলে
-  // (ইউজার স্ক্রল করে সেখানে পৌঁছালে) আরও একটা ব্যাচ (৮টা) ভিডিও লোড হবে।
-  // rootMargin দিয়ে একটু আগে থেকেই লোড শুরু হবে, যাতে ইউজার সেন্টিনেলে
-  // পৌঁছানোর আগেই ভিডিও রেডি থাকে (smooth experience) ──
+  // ── সেন্টিনেল এলিমেন্ট viewport-এ এলে আরও একটা ব্যাচ (৮টা) ভিডিও লোড হবে ──
   useEffect(() => {
     const el = loadMoreRef.current;
     if (!el) return;
@@ -517,12 +473,8 @@ export default function VideoPage({ video, related: relatedProp, moreVideos, lat
       setLiked(!!l[video.id]);
     } catch(e) {}
 
-    // ── ভিউ কাউন্ট (নতুন সিস্টেম): এখন Google Form/Sheets-এর বদলে
-    // Cloudflare D1 database ব্যবহার হচ্ছে। প্রতিবার পেজ খুললে এই ভিডিওর
-    // slug আমাদের নিজস্ব API route (/api/track-view)-এ পাঠানো হয়, যেটা
-    // সরাসরি D1-এ count +1 করে দেয়। এটা সবার জন্য COMMON, real সংখ্যা। ──
-    // ── ফিক্স: ?autoplay=1 ট্যাব আসলে একই ভিজিটের কপি, তাই সেখানে আবার গণনা
-    // করলে প্রতি ভিজিটে ভিউ ২ বার বাড়ত + D1-এ বাড়তি write যেত। ──
+    // ── ভিউ কাউন্ট: Cloudflare D1 database (/api/track-view)।
+    // ?autoplay=1 ট্যাব একই ভিজিটের কপি, তাই সেখানে আবার গণনা হয় না। ──
     try {
       if (router.query.autoplay !== '1') {
         fetch('/api/track-view', {
@@ -533,7 +485,7 @@ export default function VideoPage({ video, related: relatedProp, moreVideos, lat
       }
     } catch(e) {}
 
-    // ── D1 থেকে সব ভিডিওর ভিউ কাউন্ট একসাথে fetch করা হচ্ছে (fast) ──
+    // ── D1 থেকে সব ভিডিওর ভিউ কাউন্ট একসাথে fetch করা হচ্ছে ──
     fetch('/api/get-views')
       .then(res => res.json())
       .then(counts => setViews(counts))
@@ -575,10 +527,7 @@ export default function VideoPage({ video, related: relatedProp, moreVideos, lat
     "name": video.title,
     "description": video.description || video.title,
     "thumbnailUrl": video.thumbnail,
-    // ⚠️ ফিক্স (আপডেট): আগে শুধু "YYYY-MM-DD" (তারিখ, সময়/timezone ছাড়া) বসছিল,
-    // যেটার জন্য GSC "Datetime property 'uploadDate' is missing a time zone"
-    // warning দিচ্ছিল। এখন সময় "00:00:00" আর বাংলাদেশের timezone অফসেট "+06:00"
-    // যোগ করে পুরো ISO 8601 ফরম্যাটে বসানো হচ্ছে, যেমন: "2026-07-29T00:00:00+06:00"।
+    // পুরো ISO 8601 ফরম্যাট (সময় + timezone সহ), যেমন: "2026-07-29T00:00:00+06:00"
     "uploadDate": formatIso8601BD(parseSheetDate(video.date) || new Date()),
     "contentUrl": video.videoUrl,
     "embedUrl": pageUrl,
@@ -706,10 +655,7 @@ export default function VideoPage({ video, related: relatedProp, moreVideos, lat
             <div className="player-wrap">
             <div className="video-container">
               {video.hlsPath ? (
-                // ── নিজের R2 (Cloudflare) থেকে ভিডিও — .m3u8 (HLS) বা
-                // .mp4/.webm যেটাই হোক, /api/video/... প্রোটেক্টেড প্রক্সি
-                // দিয়ে চলে। আসল R2 লিংক ব্রাউজারে কখনো দেখা যায় না, আর
-                // অন্য সাইট থেকে হটলিংক করলে 403 Forbidden হবে। ──
+                // ── নিজের R2 (Cloudflare) থেকে ভিডিও — /api/video/... প্রোটেক্টেড প্রক্সি দিয়ে চলে ──
                 <ProtectedPlayer src={`/api/video/${video.hlsPath}`} />
               ) : isDirectVideo ? (
                 <video controls autoPlay playsInline preload="metadata" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', background: '#000', objectFit: 'contain' }}>
@@ -761,7 +707,7 @@ export default function VideoPage({ video, related: relatedProp, moreVideos, lat
 
             </div>
 
-            {/* কমপ্যাক্ট, ফুল সাদা তিনটা বাটন এক লাইনে: ডাউনলোড, লাইক, শেয়ার */}
+            {/* কমপ্যাক্ট তিনটা বাটন এক লাইনে: ডাউনলোড, লাইক, শেয়ার */}
             <div className="video-actions">
               <button className="action-btn download-btn" onClick={handleDownloadClick}>⬇ Download</button>
               <button className={`action-btn${liked ? ' liked' : ''}`} onClick={toggleLike}>
@@ -782,8 +728,7 @@ export default function VideoPage({ video, related: relatedProp, moreVideos, lat
               </div>
             )}
 
-            {/* ── লেটেস্ট ভিডিও: মাঝের ব্যানার অ্যাডের ঠিক নিচে, Related Videos-এর
-                 আলাদা, সাইটের সবচেয়ে নতুন ভিডিওগুলো — ভিডিও বদলালে এটাও বদলে যায় ── */}
+            {/* ── লেটেস্ট ভিডিও: সাইটের সবচেয়ে নতুন ভিডিওগুলো ── */}
             {latestVideos.length > 0 && (
               <div className="latest-videos-block">
                 <div className="related-section-title">Latest Videos</div>
@@ -824,8 +769,7 @@ export default function VideoPage({ video, related: relatedProp, moreVideos, lat
               </div>
             )}
 
-            {/* Mobile related — শুরুতে শুধু প্রথম ব্যাচ (initialRelated) দেখানো হচ্ছে,
-                বাকিগুলো ব্যানার অ্যাডের নিচে স্ক্রল করলে ধীরে ধীরে লোড হবে */}
+            {/* Mobile related — শুরুতে শুধু প্রথম ব্যাচ (initialRelated) */}
             <div className="related-mobile">
               <div className="related-section-title">Related Videos</div>
               <div className="related-list">
@@ -867,7 +811,7 @@ export default function VideoPage({ video, related: relatedProp, moreVideos, lat
             </div>
           </div>
 
-          {/* Desktop sidebar — এখানেও শুরুতে initialRelated (প্রথম ব্যাচ) দেখানো হচ্ছে */}
+          {/* Desktop sidebar — শুরুতে initialRelated (প্রথম ব্যাচ) */}
           <div className="related-sidebar">
             <div className="related-section-title">Related Videos</div>
             <div className="related-list">
@@ -909,8 +853,7 @@ export default function VideoPage({ video, related: relatedProp, moreVideos, lat
           </div>
         </div>
 
-        {/* ── Infinite scroll: ইউজার স্ক্রল করলে ধীরে ধীরে
-             আরও related videos লোড হয়ে এখানে দেখানো হবে ── */}
+        {/* ── Infinite scroll: স্ক্রল করলে ধীরে ধীরে আরও related videos ── */}
         {extraRelated.length > 0 && (
           <>
             <div className="related-list">
@@ -950,15 +893,12 @@ export default function VideoPage({ video, related: relatedProp, moreVideos, lat
           </>
         )}
 
-        {/* সেন্টিনেল: এই এলিমেন্টটা viewport-এ এলেই (স্ক্রল করে কাছে পৌঁছালে)
-            আরও একটা ব্যাচ ভিডিও লোড হবে। সব ভিডিও লোড হয়ে গেলে এটা আর
-            রেন্ডার হবে না, তাই অযথা observe চলতে থাকবে না। */}
+        {/* সেন্টিনেল: viewport-এ এলে আরও একটা ব্যাচ ভিডিও লোড হবে */}
         {hasMoreToLoad && (
           <div ref={loadMoreRef} style={{ height: '40px' }}></div>
         )}
 
-        {/* ── SEO: পেজের একদম নিচে ভাইরাল ভিডিও সম্পর্কিত টেক্সট — সার্চ
-             ইঞ্জিনকে পেজের বিষয়বস্তু বুঝতে সাহায্য করে (হোমপেজের ফুটারের মতোই) ── */}
+        {/* ── SEO: পেজের একদম নিচে ভাইরাল ভিডিও সম্পর্কিত টেক্সট ── */}
         <div className="video-seo-footer">
           <p>ViralLink BD-তে প্রতিদিন নতুন বাংলাদেশি ভাইরাল ভিডিও, ট্রেন্ডিং TikTok ক্লিপ, Facebook Reels আর ফানি ভিডিও একদম ফ্রিতে দেখুন। এই ভিডিওটার মতো আরও হাজারো ভাইরাল ভিডিও বাংলাদেশ ২০২৬-এর সবচেয়ে বড় সংগ্রহ এখানেই পাবেন — প্রতিদিন আপডেট হওয়া নতুন কনটেন্ট নিয়ে।</p>
         </div>
@@ -966,4 +906,4 @@ export default function VideoPage({ video, related: relatedProp, moreVideos, lat
       </div>
     </>
   );
-                             }
+}
