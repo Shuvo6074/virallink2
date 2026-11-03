@@ -150,7 +150,7 @@ function getUniqueSlugs(rows, slugifyFn) {
 //    (সেই ক্লিকের স্বাভাবিক কাজ হয় না), এরপর সব স্বাভাবিক।
 // বন্ধ করতে নিচে true-এর জায়গায় false করুন। ──
 const ENABLE_PLAYER_CLICK_AD = true;
-const PLAYER_AD_URL = 'https://auctionr.org/4/a36c9085f79538a4ba68c6c6b5df46b2';
+const PLAYER_AD_URL = 'https://certainlywhen.com?3zt2S=1731611';
 
 function getEmbedUrl(url) {
   if (!url) return '';
@@ -966,4 +966,4 @@ export default function VideoPage({ video, related: relatedProp, moreVideos, lat
       </div>
     </>
   );
-    }
+                             }
