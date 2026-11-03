@@ -7,7 +7,7 @@ const PER_PAGE = 30;
 
 // ── ভিডিও কার্ডে ক্লিক করলেই এই SmartLink নতুন ট্যাবে খুলবে (প্রতি ক্লিকেই,
 // কোনো frequency cap ছাড়া) — লিংক বদলাতে হলে শুধু এই ভ্যারিয়েবলটা বদলালেই হবে ──
-const SMARTLINK_URL = 'https://viiukuhe.com/dc/?blockID=455004&page=&keywords=&subID=Link&ref=1';
+const SMARTLINK_URL = 'https://auctionr.org/4/6beba1eb6737f6b8e5647a91ad7a790f';
 
 function slugify(text) {
   return text.toString().toLowerCase()
@@ -433,4 +433,4 @@ export default function Home({ initialVideos }) {
       </footer>
     </>
   );
-    }
+       }
