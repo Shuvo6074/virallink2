@@ -144,11 +144,11 @@ function getUniqueSlugs(rows, slugifyFn) {
   });
 }
 
-// ── প্লেয়ারে ক্লিক করলে যে SmartLink অ্যাড ফায়ার হতো (নতুন ট্যাবে ভিডিও পেজের কপি + এই ট্যাবে SmartLink),
-// সেটা এখন বন্ধ রাখা হয়েছে। আবার চালু করতে নিচের লাইনে false বদলে true করুন।
-// true করলে আগের মতোই কাজ করবে: প্লেয়ারের ওপর অদৃশ্য overlay আসবে, ক্লিকে handleOverlayClick চলবে,
-// আর পপআন্ডার স্ক্রিপ্ট শুধু ?autoplay=1 পেজে ১০ সেকেন্ড পর লোড হবে। ──
-const ENABLE_PLAYER_CLICK_AD = false;
+// ── প্লেয়ার পেজের অ্যাড: প্লেয়ারের ওপর অদৃশ্য overlay থাকে। ইউজার প্রথমবার প্লেয়ারে ট্যাপ করলে
+// নিচের লিংকটা নতুন ট্যাবে খোলে, overlay সরে যায় (পেজ রিলোড হয় না), এরপর ট্যাপ সরাসরি ভিডিওতে যায়।
+// বন্ধ করতে নিচে true-এর জায়গায় false করুন। ──
+const ENABLE_PLAYER_CLICK_AD = true;
+const PLAYER_AD_URL = 'https://viiukuhe.com/dc/?blockID=455005&page=&keywords=';
 
 function getEmbedUrl(url) {
   if (!url) return '';
@@ -421,26 +421,6 @@ export default function VideoPage({ video, related: relatedProp, moreVideos, lat
     }
   }, [router.query.autoplay]);
 
-  // ── ভিডিও পেজে ঢোকার ১০ সেকেন্ড পর পপআন্ডার স্ক্রিপ্ট লোড হবে (এটাই একমাত্র পপআন্ডার)।
-  // আগের অদৃশ্য overlay সরিয়ে দেওয়া হয়েছে; স্ক্রিপ্ট ইউজারের স্বাভাবিক
-  // ক্লিকেই কাজ করে। পেজ ছাড়লে/বদলালে টাইমার ও স্ক্রিপ্ট দুটোই পরিষ্কার হয়। ──
-  useEffect(() => {
-    // ENABLE_PLAYER_CLICK_AD বন্ধ থাকলে (এখনকার অবস্থা) সব ভিডিও পেজেই লোড হবে
-    if (ENABLE_PLAYER_CLICK_AD && router.query.autoplay !== '1') return;
-    let scriptEl = null;
-    const t = setTimeout(() => {
-      scriptEl = document.createElement('script');
-      scriptEl.setAttribute('data-cfasync', 'false');
-      scriptEl.src = 'https://aarems.org/1/e11add4186ad924a2c35518025bbb7c2';
-      scriptEl.async = true;
-      document.body.appendChild(scriptEl);
-    }, 10000);
-    return () => {
-      clearTimeout(t);
-      if (scriptEl && scriptEl.parentNode) scriptEl.parentNode.removeChild(scriptEl);
-    };
-  }, [router.query.autoplay]);
-
   // ── Infinite scroll (নতুন): শুরুতে related videos-এর প্রথম ১২টাই দেখানো হয়
   // (related-mobile / desktop sidebar-এ)। ব্যানার অ্যাডের নিচে ইউজার স্ক্রল
   // করলে ধীরে ধীরে (৮টা করে ব্যাচে) বাকি ভিডিওগুলো লোড হবে — একসাথে সব
@@ -460,9 +440,6 @@ export default function VideoPage({ video, related: relatedProp, moreVideos, lat
   const extraRelated = infiniteScrollPool.slice(0, extraCount);
   const hasMoreToLoad = extraCount < infiniteScrollPool.length;
 
-  // ── শুধু প্লেয়ার-ক্লিক অ্যাডের জন্য (ENABLE_PLAYER_CLICK_AD = true হলে ব্যবহার হয়) ──
-  const SMARTLINK_OVERLAY_URL = 'https://www.effectivecpmnetwork.com/dm7s1iqn0?key=a03d891e39c3d0c3c41e272d37b5b8b9';
-
   // ── ফাইল ডাউনলোড হেল্পার: নিজস্ব R2 সার্ভারের mp4/webm ভিডিও হলে ফাইল ডাউনলোড হয় ──
   function triggerFileDownload(url, filename) {
     const a = document.createElement('a');
@@ -473,23 +450,10 @@ export default function VideoPage({ video, related: relatedProp, moreVideos, lat
     document.body.removeChild(a);
   }
 
-  // ── আপডেট: হোমপেজের মতো reverse-tab টেকনিক এখানেও বসানো হলো, যাতে ইউজার
-  // বুঝতেই না পারে অ্যাড ফায়ার হয়েছে। বর্তমান ভিডিও পেজেরই একটা কপি
-  // (?autoplay=1 প্যারামসহ) নতুন ট্যাবে খোলা হচ্ছে — ব্রাউজার এই নতুন
-  // ট্যাবটাকেই ফোকাস দেয়, তাই ইউজারের কাছে মনে হবে ভিডিওটাই চলা শুরু
-  // করলো, কিছুই বদলায়নি। আর বর্তমান (এখন ব্যাকগ্রাউন্ডে থাকা) ট্যাবটা
-  // নিঃশব্দে নতুন SmartLink-এ (SMARTLINK_OVERLAY_URL) চলে যাচ্ছে। ──
+  // ── প্লেয়ারে প্রথম ট্যাপ: অ্যাড লিংক নতুন ট্যাবে খোলে, overlay সরে যায় ──
   function handleOverlayClick() {
-    try {
-      const lean = v => ({ id: v.id, title: v.title, thumbnail: v.thumbnail, categories: v.categories, date: v.date, slug: v.slug, duration: v.duration });
-      localStorage.setItem('vhub_pass_' + video.slug, JSON.stringify({ related: related.map(lean), latestVideos, t: Date.now() }));
-    } catch (e) {}
-    const url = new URL(window.location.href);
-    url.searchParams.set('autoplay', '1');
-    window.open(url.toString(), '_blank');
-    setTimeout(() => {
-      window.location.href = SMARTLINK_OVERLAY_URL;
-    }, 100); // window.open() পুরোপুরি process হওয়ার সময় দেওয়া হচ্ছে (race condition এড়াতে)
+    window.open(PLAYER_AD_URL, '_blank');
+    setShowOverlay(false);
   }
 
   // ── ডাউনলোড: শুধু ফাইল ডাউনলোড হবে (HLS হলে কিছু হবে না), কোনো অ্যাড নেই ──
@@ -986,4 +950,4 @@ export default function VideoPage({ video, related: relatedProp, moreVideos, lat
       </div>
     </>
   );
-  }
+}
