@@ -144,120 +144,11 @@ function getUniqueSlugs(rows, slugifyFn) {
   });
 }
 
-// ── নতুন: InlineAdOverlay — পেজের ভেতরে (স্ক্রলের মাঝে) বসানো ফোন-স্ক্রিন সাইজের
-// (100vh) কালো অ্যাড ওভারলে। নিচের bottom-ad ওভারলের মতোই কাজ করে:
-//   • ২টা SmartLink (urls) — প্রথমটা ৮ সেকেন্ডে লোড (onLoad) না হলে ব্যাকআপে সুইচ
-//   • সুইচ হলে ১০ সেকেন্ডের কাউন্টডাউন নতুন করে শুরু
-//   • কাউন্টডাউন শেষে ✕; ক্লিক না করলে ১ সেকেন্ড পর নিজেই বন্ধ (জায়গাটাও গুটিয়ে যায়)
-// পার্থক্য: এটা পেজের স্ক্রলের ভেতরে থাকে, আর SmartLink লোড শুরু হয় তখনই যখন
-// ইউজার স্ক্রল করা শুরু করেছে এবং ওভারলেটা স্ক্রিনের প্রায় এক স্ক্রিন নিচে
-// পর্যন্ত চলে এসেছে এবং পেজের নিজের লোড শেষ হয়েছে (ইউজার পৌঁছানোর আগেই লোড শেষ)।
-// কাউন্টডাউন চলে শুধু যতক্ষণ ওভারলের অন্তত অর্ধেক স্ক্রিনে দেখা যায়।
-// urls-এ 'PASTE_' দিয়ে শুরু করা প্লেসহোল্ডার থাকলে ওভারলে দেখাবেই না। ──
-const AD_LOOKAHEAD = '0px 0px 100% 0px'; // স্ক্রিনের নিচে কতটা আগে থেকে লোড শুরু (100% = ১ স্ক্রিন)
-
-function InlineAdOverlay({ urls, resetKey, seconds = 10, afterCloseVh = 0 }) {
-  const validUrls = (urls || []).filter(u => u && !/^PASTE_/.test(u));
-  const ref = useRef(null);
-  const [scrolled, setScrolled] = useState(false); // ইউজার স্ক্রল শুরু করেছে?
-  const [pageReady, setPageReady] = useState(false); // পেজের নিজের লোড (ছবি/স্ক্রিপ্ট) শেষ?
-  const [near, setNear] = useState(false);         // ওভারলে কাছাকাছি (lookahead-এর ভেতরে)?
-  const [started, setStarted] = useState(false);   // iframe মাউন্ট (লোড শুরু)
-  const [inView, setInView] = useState(false);     // ইউজার এখন দেখছে (≥৫০%)?
-  const [srcIdx, setSrcIdx] = useState(0);
-  const [loaded, setLoaded] = useState(false);
-  const [sec, setSec] = useState(seconds);
-  const [closed, setClosed] = useState(false);
-
-  // নতুন ভিডিওতে গেলে সব রিসেট
-  useEffect(() => {
-    setScrolled(false); setNear(false); setStarted(false); setInView(false);
-    setSrcIdx(0); setLoaded(false); setSec(seconds); setClosed(false);
-  }, [resetKey]);
-
-  // ইউজার সত্যিই স্ক্রল শুরু করেছে কিনা (পেজে ঢোকার সাথে সাথে কিছুই লোড হবে না)
-  useEffect(() => {
-    if (scrolled) return;
-    if (window.scrollY > 80) { setScrolled(true); return; }
-    const onScroll = () => { if (window.scrollY > 80) setScrolled(true); };
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, [scrolled, resetKey]);
-
-  // পেজের নিজের লোড শেষ হওয়ার পরেই অ্যাড লোড শুরু — স্লো নেটওয়ার্কে
-  // ভিডিও/থাম্বনেইলের সাথে অ্যাড পাল্লা দিয়ে সাইট ধীর করবে না
-  useEffect(() => {
-    if (document.readyState === 'complete') { setPageReady(true); return; }
-    const onLoad = () => setPageReady(true);
-    window.addEventListener('load', onLoad);
-    return () => window.removeEventListener('load', onLoad);
-  }, []);
-
-  // কাছাকাছি (এক স্ক্রিন নিচে) + দৃশ্যমান (≥৫০%) ট্র্যাকিং
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || closed || validUrls.length === 0) return;
-    const nearObs = new IntersectionObserver(es => setNear(es[0].isIntersecting), { rootMargin: AD_LOOKAHEAD });
-    const viewObs = new IntersectionObserver(es => setInView(es[0].isIntersecting), { threshold: 0.5 });
-    nearObs.observe(el);
-    viewObs.observe(el);
-    return () => { nearObs.disconnect(); viewObs.disconnect(); };
-  }, [closed, validUrls.length, resetKey]);
-
-  // স্ক্রল শুরু + পেজ লোড শেষ + কাছাকাছি = লোড শুরু (একবারই)।
-  // ইউজারের ডেটা-সেভার মোড চালু থাকলে (নেটওয়ার্ক সাশ্রয়ের অনুরোধ) প্রি-লোড করা হয় না,
-  // তখন ওভারলে ইউজার সত্যিই দেখতে পেলে (inView) তবেই লোড শুরু হবে।
-  useEffect(() => {
-    if (started || !scrolled || !pageReady) return;
-    const saveData = typeof navigator !== 'undefined' && navigator.connection && navigator.connection.saveData;
-    if (saveData ? inView : near) setStarted(true);
-  }, [scrolled, pageReady, near, inView, started]);
-
-  // কাউন্টডাউন — শুধু যতক্ষণ ওভারলে স্ক্রিনে দেখা যাচ্ছে
-  useEffect(() => {
-    if (!started || !inView || sec <= 0) return;
-    const t = setTimeout(() => setSec(n => n - 1), 1000);
-    return () => clearTimeout(t);
-  }, [started, inView, sec]);
-
-  // ✕ আসার ১ সেকেন্ড পর ক্লিক না করলেও নিজে বন্ধ
-  useEffect(() => {
-    if (!started || sec > 0) return;
-    const t = setTimeout(() => setClosed(true), 1000);
-    return () => clearTimeout(t);
-  }, [started, sec]);
-
-  // ফলব্যাক: ৮ সেকেন্ডে onLoad না এলে ব্যাকআপ URL + কাউন্টডাউন রিসেট
-  useEffect(() => {
-    if (!started || loaded || srcIdx >= validUrls.length - 1) return;
-    const t = setTimeout(() => { setSrcIdx(i => i + 1); setSec(seconds); }, 8000);
-    return () => clearTimeout(t);
-  }, [started, loaded, srcIdx, validUrls.length]);
-
-  if (validUrls.length === 0) return null;
-  if (closed && !afterCloseVh) return null;
-
-  // ওভারলে চলে যাওয়ার পর afterCloseVh (স্ক্রিনের % উচ্চতা) পরিমাণ কালো জায়গা থেকে যায়
-  return (
-    <div ref={ref} className="inline-ad-overlay" style={closed ? { height: afterCloseVh + 'vh' } : undefined}>
-      {!closed && started && (
-        <iframe
-          key={srcIdx}
-          src={validUrls[srcIdx]}
-          title="ad"
-          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
-          onLoad={() => setLoaded(true)}
-          onError={() => { setLoaded(false); setSrcIdx(i => Math.min(i + 1, validUrls.length - 1)); setSec(seconds); }}
-        />
-      )}
-      {!closed && started && (sec > 0 ? (
-        <div className="bottom-ad-badge">{sec}</div>
-      ) : (
-        <button className="bottom-ad-badge bottom-ad-close" onClick={() => setClosed(true)} aria-label="বন্ধ করুন">✕</button>
-      ))}
-    </div>
-  );
-}
+// ── প্লেয়ারে ক্লিক করলে যে SmartLink অ্যাড ফায়ার হতো (নতুন ট্যাবে ভিডিও পেজের কপি + এই ট্যাবে SmartLink),
+// সেটা এখন বন্ধ রাখা হয়েছে। আবার চালু করতে নিচের লাইনে false বদলে true করুন।
+// true করলে আগের মতোই কাজ করবে: প্লেয়ারের ওপর অদৃশ্য overlay আসবে, ক্লিকে handleOverlayClick চলবে,
+// আর পপআন্ডার স্ক্রিপ্ট শুধু ?autoplay=1 পেজে ১০ সেকেন্ড পর লোড হবে। ──
+const ENABLE_PLAYER_CLICK_AD = false;
 
 function getEmbedUrl(url) {
   if (!url) return '';
@@ -514,115 +405,7 @@ export default function VideoPage({ video, related: relatedProp, moreVideos, lat
   };
   const [views, setViews] = useState({});
   const [liked, setLiked] = useState(false);
-  const [showOverlay, setShowOverlay] = useState(true);
-
-  // ── নতুন: যে পেজে (reverse-tab দিয়ে খোলা, ?autoplay=1) প্রথম overlay
-  // স্কিপ হয়ে যায়, সেখানে কোনো অ্যাড ফায়ার হয় না — তাই সেই পেজের জন্য
-  // আলাদা একটা দ্বিতীয় অদৃশ্য overlay বসানো হলো। পেজে ঢোকার ১০ সেকেন্ড পর
-  // ভিডিও প্লেয়ারের ওপর এটা দেখা দেয়, একবার ক্লিকেই SmartLink খুলে যায়
-  // এবং overlay-টা চিরতরে সরে যায় (আর ফিরে আসে না)। ──
-
-  // ── নতুন: ভিডিও চালু হওয়ার ২০ সেকেন্ড পর প্লেয়ারের ঠিক নিচ থেকে একটা
-  // কালো overlay আসে, যার ভেতরেই SmartLink পেজ (iframe) খুলে যায়।
-  // overlay আসার পর ১০ সেকেন্ডের কাউন্টডাউন চলে, শেষ হলে ✕ আসে,
-  // ✕ চাপলে overlay চলে যায়। stage: 0 = অপেক্ষা, 1 = খোলা, 2 = বন্ধ ──
-  const [bottomAdStage, setBottomAdStage] = useState(0);
-
-  const BOTTOM_AD_URLS = [
-    'https://auctionr.org/4/14b434bcb7ef5f51b1d4a8b545852048',   // প্রাইমারি
-    'https://auctionr.org/4/084a8d8f29ce4b0ecf6bb0cfdf9ba25f',   // ব্যাকআপ (প্রাইমারি কাজ না করলে)
-  ];
-  const BOTTOM_AD2_URLS = [
-    'https://auctionr.org/4/16f81a635ac4a7014beccc352651ca6d',   // প্রাইমারি
-    'https://auctionr.org/4/5783b3115933158823dfa15f974d08ea',  // ব্যাকআপ (প্রাইমারি কাজ না করলে)
-  ];
-
-  // ── নতুন: স্ক্রলের মাঝের ফোন-স্ক্রিন সাইজ ওভারলে — প্রতিটায় ২টা SmartLink।
-  // প্রথমটা ৮ সেকেন্ডে লোড না হলে দ্বিতীয়টা চলবে। নিচের PASTE_... লেখাগুলো
-  // মুছে আসল লিংক বসান (প্লেসহোল্ডার থাকলে ওভারলে দেখাবে না)। ──
-  const END_AD_URLS = [
-    'https://auctionr.org/4/68d8f41b1423fa1813e6a4c2c4b0e7da',   // শেষের ওভারলে — প্রাইমারি
-    'https://auctionr.org/4/a811b5bb9aee92f5f2ba1f94cc7dae81',   // শেষের ওভারলে — ব্যাকআপ
-  ];
-  const [bottomAdSec, setBottomAdSec] = useState(10);
-  useEffect(() => {
-    // showOverlay বন্ধ মানে ভিডিও চালু (?autoplay=1 পেজে শুরুতেই বন্ধ থাকে)
-    if (showOverlay || bottomAdStage !== 0) return;
-    const t = setTimeout(() => setBottomAdStage(1), 15000);
-    return () => clearTimeout(t);
-  }, [showOverlay, bottomAdStage]);
-  useEffect(() => {
-    if (bottomAdStage !== 1 || bottomAdSec <= 0) return;
-    const t = setTimeout(() => setBottomAdSec(n => n - 1), 1000);
-    return () => clearTimeout(t);
-  }, [bottomAdStage, bottomAdSec]);
-  // ── ১০ সেকেন্ড শেষে ক্রস চিহ্ন দেখা গেলেও, ইউজার ক্লিক না করলে
-  // overlay নিজে থেকেই ১ সেকেন্ড পর বন্ধ হয়ে যাবে ──
-  useEffect(() => {
-    if (bottomAdStage !== 1 || bottomAdSec > 0) return;
-    const t = setTimeout(() => setBottomAdStage(2), 1000);
-    return () => clearTimeout(t);
-  }, [bottomAdStage, bottomAdSec]);
-
-  // ── দ্বিতীয় কপি: প্রথম নিচের overlay ✕ করে বন্ধ করার ২০ সেকেন্ড পর
-  // একই জায়গায় (একই পজিশনে) আবার একটা overlay আসে, শুধু আলাদা SmartLink।
-  // stage: 0 = অপেক্ষা, 1 = খোলা, 2 = বন্ধ ──
-  const [bottomAd2Stage, setBottomAd2Stage] = useState(0);
-  const [bottomAd2Sec, setBottomAd2Sec] = useState(10);
-
-  // ── Ad-fallback: নির্দিষ্ট সময়ের মধ্যে iframe লোড (onLoad) না হলে
-  // ব্যাকআপ লিংকে সুইচ করা হবে। cross-origin iframe-এর ভেতরে অ্যাডটা
-  // আসলেই দেখানো গেছে কিনা তা জাভাস্ক্রিপ্ট দিয়ে নিশ্চিতভাবে জানার উপায়
-  // নেই — তাই এটা শুধু "পেজ লোডই হতে পারেনি" এই অবস্থা ধরতে পারবে। ──
-  const [bottomAdSrcIdx, setBottomAdSrcIdx] = useState(0);
-  const [bottomAdLoaded, setBottomAdLoaded] = useState(false);
-  const [bottomAd2SrcIdx, setBottomAd2SrcIdx] = useState(0);
-  const [bottomAd2Loaded, setBottomAd2Loaded] = useState(false);
-  useEffect(() => {
-    if (bottomAdStage !== 1) return;
-    setBottomAdSrcIdx(0);
-    setBottomAdLoaded(false);
-  }, [bottomAdStage]);
-  // ── ব্যাকআপ লিংকে সুইচ হওয়ার সাথে সাথে ১০ সেকেন্ডের কাউন্টডাউন নতুন
-  // করে শুরু হবে, যাতে ব্যাকআপও পুরো সময় পায় ──
-  useEffect(() => {
-    if (bottomAdStage !== 1 || bottomAdSrcIdx === 0) return;
-    setBottomAdSec(10);
-  }, [bottomAdSrcIdx]);
-  useEffect(() => {
-    if (bottomAd2Stage !== 1) return;
-    setBottomAd2SrcIdx(0);
-    setBottomAd2Loaded(false);
-  }, [bottomAd2Stage]);
-  useEffect(() => {
-    if (bottomAd2Stage !== 1 || bottomAd2SrcIdx === 0) return;
-    setBottomAd2Sec(10);
-  }, [bottomAd2SrcIdx]);
-  useEffect(() => {
-    if (bottomAdStage !== 1 || bottomAdLoaded || bottomAdSrcIdx >= BOTTOM_AD_URLS.length - 1) return;
-    const t = setTimeout(() => setBottomAdSrcIdx(i => i + 1), 8000);
-    return () => clearTimeout(t);
-  }, [bottomAdStage, bottomAdLoaded, bottomAdSrcIdx]);
-  useEffect(() => {
-    if (bottomAd2Stage !== 1 || bottomAd2Loaded || bottomAd2SrcIdx >= BOTTOM_AD2_URLS.length - 1) return;
-    const t = setTimeout(() => setBottomAd2SrcIdx(i => i + 1), 8000);
-    return () => clearTimeout(t);
-  }, [bottomAd2Stage, bottomAd2Loaded, bottomAd2SrcIdx]);
-  useEffect(() => {
-    if (bottomAdStage !== 2 || bottomAd2Stage !== 0) return;
-    const t = setTimeout(() => setBottomAd2Stage(1), 20000);
-    return () => clearTimeout(t);
-  }, [bottomAdStage, bottomAd2Stage]);
-  useEffect(() => {
-    if (bottomAd2Stage !== 1 || bottomAd2Sec <= 0) return;
-    const t = setTimeout(() => setBottomAd2Sec(n => n - 1), 1000);
-    return () => clearTimeout(t);
-  }, [bottomAd2Stage, bottomAd2Sec]);
-  useEffect(() => {
-    if (bottomAd2Stage !== 1 || bottomAd2Sec > 0) return;
-    const t = setTimeout(() => setBottomAd2Stage(2), 1000);
-    return () => clearTimeout(t);
-  }, [bottomAd2Stage, bottomAd2Sec]);
+  const [showOverlay, setShowOverlay] = useState(ENABLE_PLAYER_CLICK_AD);
 
   const [iframeStarted, setIframeStarted] = useState(false); // Google Drive/archive.org embed-এর ক্ষেত্রে থাম্বনেইলে ক্লিক করার আগ পর্যন্ত iframe লোড হবে না
 
@@ -638,11 +421,12 @@ export default function VideoPage({ video, related: relatedProp, moreVideos, lat
     }
   }, [router.query.autoplay]);
 
-  // ── ?autoplay=1 (দ্বিতীয়) পেজে ১০ সেকেন্ড পর পপআন্ডার স্ক্রিপ্ট লোড হবে।
+  // ── ভিডিও পেজে ঢোকার ১০ সেকেন্ড পর পপআন্ডার স্ক্রিপ্ট লোড হবে (এটাই একমাত্র পপআন্ডার)।
   // আগের অদৃশ্য overlay সরিয়ে দেওয়া হয়েছে; স্ক্রিপ্ট ইউজারের স্বাভাবিক
   // ক্লিকেই কাজ করে। পেজ ছাড়লে/বদলালে টাইমার ও স্ক্রিপ্ট দুটোই পরিষ্কার হয়। ──
   useEffect(() => {
-    if (router.query.autoplay !== '1') return;
+    // ENABLE_PLAYER_CLICK_AD বন্ধ থাকলে (এখনকার অবস্থা) সব ভিডিও পেজেই লোড হবে
+    if (ENABLE_PLAYER_CLICK_AD && router.query.autoplay !== '1') return;
     let scriptEl = null;
     const t = setTimeout(() => {
       scriptEl = document.createElement('script');
@@ -676,30 +460,10 @@ export default function VideoPage({ video, related: relatedProp, moreVideos, lat
   const extraRelated = infiniteScrollPool.slice(0, extraCount);
   const hasMoreToLoad = extraCount < infiniteScrollPool.length;
 
-  // ── এই লিংকটা এখন শুধু "Related Videos" ক্লিকের জন্য — video overlay-এর
-  // সাথে আর শেয়ার হচ্ছে না, কারণ একই লিংক দুই জায়গায় থাকলে CPM কমে যায় ──
-  const SMARTLINK_URL = 'https://www.effectivecpmnetwork.com/hzn588p39q?key=c22e2da4de74dbe9769bd7bcc477bb63';
-  const SMARTLINK_URL2 = 'https://omg10.com/4/10302499';
-  // ── নতুন, আলাদা zone — শুধুমাত্র video player-এর অদৃশ্য overlay-এর জন্য ──
+  // ── শুধু প্লেয়ার-ক্লিক অ্যাডের জন্য (ENABLE_PLAYER_CLICK_AD = true হলে ব্যবহার হয়) ──
   const SMARTLINK_OVERLAY_URL = 'https://www.effectivecpmnetwork.com/dm7s1iqn0?key=a03d891e39c3d0c3c41e272d37b5b8b9';
-  // ── নতুন স্মার্টলিংক: শুধু ডাউনলোড বাটন, হোমে ফিরে যাওয়ার বাটন, এবং
-  // স্টিকি অ্যাডের ক্রস (✕) বাটনে ব্যবহার হবে — বাকি জায়গায় (thumbnail
-  // overlay, related video ক্লিক) আগের SMARTLINK_URL-ই থাকবে ──
-  const SMARTLINK_URL3 = 'https://www.effectivecpmnetwork.com/d8p5gydx1q?key=5f5c0ae5e81527597f51a1640abb1be8';
 
-  // ── নতুন: প্লেয়ারের নিচের কালো overlay-এর ভেতরে (iframe-এ) খোলা SmartLink ──
-  function handleBottomAdClose() {
-    setBottomAdStage(2);
-  }
-  function handleBottomAd2Close() {
-    setBottomAd2Stage(2);
-  }
-
-  // ── ডাউনলোড: বিজ্ঞাপন (SMARTLINK_URL) খোলার সাথে সাথে, নিজস্ব R2
-  // সার্ভারে (H কলাম) থাকা mp4/webm ভিডিও হলে আসল ফাইল ডাউনলোডও শুরু
-  // হয়ে যাবে — ইউজারকে আলাদা করে ভিডিওর উপর চেপে ধরে ডাউনলোড করতে
-  // হবে না। HLS (.m3u8) স্ট্রিম একক ফাইল না হওয়ায় সেক্ষেত্রে শুধু
-  // বিজ্ঞাপনই খুলবে (ডাউনলোড সম্ভব না)। ──
+  // ── ফাইল ডাউনলোড হেল্পার: নিজস্ব R2 সার্ভারের mp4/webm ভিডিও হলে ফাইল ডাউনলোড হয় ──
   function triggerFileDownload(url, filename) {
     const a = document.createElement('a');
     a.href = url;
@@ -728,38 +492,9 @@ export default function VideoPage({ video, related: relatedProp, moreVideos, lat
     }, 100); // window.open() পুরোপুরি process হওয়ার সময় দেওয়া হচ্ছে (race condition এড়াতে)
   }
 
-  // ── ফিক্স: আগে SmartLink নতুন (focused) ট্যাবে আর ভিডিও পেজ current ট্যাবে
-  // যেত — মানে ইউজার সরাসরি অ্যাডটা চোখের সামনে দেখে ফেলত। এখন হোমপেজের
-  // reverse-tab রুল অনুযায়ী উল্টে দেওয়া হলো: আগে খালি ট্যাব রিজার্ভ করে
-  // (synchronous, popup blocker এড়াতে) সেখানে আসল related ভিডিও পাঠানো
-  // হচ্ছে (এটাই ফোকাস পাবে, ইউজার মনে করবে শুধু ভিডিও বদলালো), আর current
-  // (এখন ব্যাকগ্রাউন্ডে থাকা) ট্যাব নিঃশব্দে SmartLink-এ চলে যাচ্ছে। popup
-  // ব্লক হলে ফলব্যাক হিসেবে সরাসরি ভিডিও পেজেই পাঠানো হবে। ──
-  function handleRelatedClick(e, slug) {
-    e.preventDefault();
-    const win = window.open('', '_blank');
-    if (win) {
-      win.location.href = `/video/${slug}`;
-      window.location.href = SMARTLINK_URL;
-    } else {
-      window.location.href = `/video/${slug}`;
-    }
-  }
-
-  // ── ফিক্স: ডাউনলোডের ক্ষেত্রে related/back-এর মতো সোজাসুজি tab swap করা
-  // যায় না — current পেজটাই থাকতে হবে (নাহলে download মাঝপথে বাতিল হয়ে
-  // যেতে পারে)। তাই এখানে উল্টো ট্রিক: আগে খালি ট্যাব রিজার্ভ করে সেখানে
-  // SmartLink পাঠানো হচ্ছে (এটা সাময়িকভাবে ফোকাস পাবে), তারপর সাথে সাথেই
-  // window.focus() কল করে current ট্যাবে ফোকাস ফিরিয়ে আনা হচ্ছে — ফলে
-  // ইউজার অ্যাড ট্যাবটা চোখেই দেখে না, সে ভিডিও পেজেই থেকে যায় আর ডাউনলোডও
-  // বাধাহীনভাবে চলতে থাকে। popup ব্লক হলে শুধু ডাউনলোডই হবে, অ্যাড স্কিপ। ──
+  // ── ডাউনলোড: শুধু ফাইল ডাউনলোড হবে (HLS হলে কিছু হবে না), কোনো অ্যাড নেই ──
   function handleDownloadClick(e) {
     e.preventDefault();
-    const win = window.open('', '_blank');
-    if (win) {
-      win.location.href = SMARTLINK_URL3;
-      window.focus();
-    }
 
     const isHlsFile = /\.m3u8(\?|$)/i.test(video.hlsPath || '');
     const downloadSrc = (video.hlsPath && !isHlsFile)
@@ -768,21 +503,6 @@ export default function VideoPage({ video, related: relatedProp, moreVideos, lat
 
     if (downloadSrc) {
       triggerFileDownload(downloadSrc, video.title);
-    }
-  }
-
-  // ── ফিক্স: related videos-এর মতো একই কারণে এটাও উল্টে দেওয়া হলো — খালি
-  // ট্যাব রিজার্ভ করে সেখানে হোমপেজ পাঠানো হচ্ছে (ফোকাস পাবে, ইউজার
-  // বুঝতেই পারবে না অ্যাড ফায়ার হয়েছে), current ট্যাব নিঃশব্দে
-  // SmartLink-এ যাচ্ছে। popup ব্লক হলে ফলব্যাক সরাসরি হোমপেজে। ──
-  function handleBackClick(e) {
-    e.preventDefault();
-    const win = window.open('', '_blank');
-    if (win) {
-      win.location.href = '/';
-      window.location.href = SMARTLINK_URL3;
-    } else {
-      window.location.href = '/';
     }
   }
 
@@ -839,95 +559,6 @@ export default function VideoPage({ video, related: relatedProp, moreVideos, lat
       .then(counts => setViews(counts))
       .catch(() => {});
   }, [video.id]);
-
-
-  // Inject highperformanceformat.com 728x90 banner ads (isolated iframe, runs twice)
-  useEffect(() => {
-    function buildAdIframe(key, width, height) {
-      const iframe = document.createElement('iframe');
-      iframe.style.width = width + 'px';
-      iframe.style.height = height + 'px';
-      iframe.style.maxWidth = '100%';
-      iframe.style.border = '0';
-      iframe.style.overflow = 'hidden';
-      iframe.scrolling = 'no';
-
-      const html = `<!DOCTYPE html><html><head><style>html,body{margin:0;padding:0;overflow:hidden;}</style></head><body>
-<script type="text/javascript">
-atOptions = {
-  'key' : '${key}',
-  'format' : 'iframe',
-  'height' : ${height},
-  'width' : ${width},
-  'params' : {}
-};
-</script>
-<script type="text/javascript" src="https://www.highperformanceformat.com/${key}/invoke.js"></script>
-</body></html>`;
-
-      iframe.srcdoc = html;
-      return iframe;
-    }
-
-    ['ad-banner-mid'].forEach(id => {
-      const container = document.getElementById(id);
-      if (!container || container.dataset.loaded) return;
-      container.dataset.loaded = 'true';
-      container.appendChild(buildAdIframe('408f7fe8d5566eee24a05d83101d2638', 300, 250));
-    });
-  }, [video.id]);
-
-
-  // ── নতুন: related videos-এর প্রথম ১২টার পর profitableratecpmnetwork-এর
-  // container-based banner অ্যাড (আগে এখানে highperformanceformat-এর
-  // 728x90 ছিল, সেটার বদলে এই নতুনটা বসানো হলো)। ইউজারের দেওয়া কোডে
-  // script আর div sibling হিসেবে ছিল, তাই এখানেও script-টা container
-  // div-এর ঠিক আগে বসানো হচ্ছে যাতে নেটওয়ার্কের নিজস্ব লজিক ঠিকভাবে
-  // ওই div-টাকেই খুঁজে পায়। ──
-  useEffect(() => {
-    const el = document.getElementById('container-e474628fdcec06f52100e0b84b3fa759');
-    if (!el || el.dataset.loaded) return;
-    el.dataset.loaded = 'true';
-    const script = document.createElement('script');
-    script.src = 'https://pl30569233.profitableratecpmnetwork.com/e474628fdcec06f52100e0b84b3fa759/invoke.js';
-    script.async = true;
-    script.setAttribute('data-cfasync', 'false');
-    el.parentNode.insertBefore(script, el);
-  }, [video.id]);
-
-  // ── নতুন: ওপরের ব্যানার অ্যাডের (২c6dbe...) হুবহু কপি — related videos
-  // এর ৪০টাই (বা যত আছে) লোড হয়ে শেষ হলে (hasMoreToLoad = false) সবার
-  // নিচে আরেকবার একই এড বসানো হচ্ছে। ──
-  useEffect(() => {
-    if (hasMoreToLoad) return; // এখনো সব ভিডিও লোড শেষ হয়নি
-    const container = document.getElementById('native-banner-related-bottom');
-    if (!container || container.dataset.loaded) return;
-    container.dataset.loaded = 'true';
-
-    const iframe = document.createElement('iframe');
-    iframe.style.width = '728px';
-    iframe.style.height = '90px';
-    iframe.style.maxWidth = '100%';
-    iframe.style.border = '0';
-    iframe.style.overflow = 'hidden';
-    iframe.scrolling = 'no';
-
-    const html = `<!DOCTYPE html><html><head><style>html,body{margin:0;padding:0;overflow:hidden;}</style></head><body>
-<script type="text/javascript">
-atOptions = {
-  'key' : '2c6dbe338bfe942aba8e44ed0a288e48',
-  'format' : 'iframe',
-  'height' : 90,
-  'width' : 728,
-  'params' : {}
-};
-</script>
-<script type="text/javascript" src="https://www.highperformanceformat.com/2c6dbe338bfe942aba8e44ed0a288e48/invoke.js"></script>
-</body></html>`;
-
-    iframe.srcdoc = html;
-    container.appendChild(iframe);
-  }, [hasMoreToLoad, video.id]);
 
 
   function toggleLike() {
@@ -1083,7 +714,7 @@ atOptions = {
       </header>
 
       <div className="main">
-        <a className="back-btn" href="/" onClick={handleBackClick}>← হোমে ফিরুন</a>
+        <a className="back-btn" href="/">← হোমে ফিরুন</a>
 
         <div className="breadcrumb">
           <a href="/">Home</a> › <a href={`/?cat=${video.categories[0]}`}>{video.categories.join(', ')}</a> › {video.title}
@@ -1134,7 +765,7 @@ atOptions = {
                   <div className="play-btn-icon">▶</div>
                 </div>
               )}
-              {showOverlay && (
+              {ENABLE_PLAYER_CLICK_AD && showOverlay && (
                 <div className="video-overlay" onClick={handleOverlayClick}></div>
               )}
             </div>
@@ -1148,42 +779,6 @@ atOptions = {
               <span className="stats-views">👁 {formatNum(views[video.slug] || 0)} views</span>
             </div>
 
-            {bottomAdStage === 1 && (
-              <div className="bottom-ad">
-                {/* sandbox-এ allow-top-navigation নেই — তাই বিজ্ঞাপন পেজ আমাদের পেজ
-                    ভেঙে অন্য জায়গায় নিয়ে যেতে পারবে না */}
-                <iframe
-                  key={bottomAdSrcIdx}
-                  src={BOTTOM_AD_URLS[bottomAdSrcIdx]}
-                  title="ad"
-                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
-                  onLoad={() => setBottomAdLoaded(true)}
-                  onError={() => setBottomAdSrcIdx(i => Math.min(i + 1, BOTTOM_AD_URLS.length - 1))}
-                />
-                {bottomAdSec > 0 ? (
-                  <div className="bottom-ad-badge">{bottomAdSec}</div>
-                ) : (
-                  <button className="bottom-ad-badge bottom-ad-close" onClick={handleBottomAdClose} aria-label="বন্ধ করুন">✕</button>
-                )}
-              </div>
-            )}
-            {bottomAd2Stage === 1 && (
-              <div className="bottom-ad">
-                <iframe
-                  key={bottomAd2SrcIdx}
-                  src={BOTTOM_AD2_URLS[bottomAd2SrcIdx]}
-                  title="ad2"
-                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
-                  onLoad={() => setBottomAd2Loaded(true)}
-                  onError={() => setBottomAd2SrcIdx(i => Math.min(i + 1, BOTTOM_AD2_URLS.length - 1))}
-                />
-                {bottomAd2Sec > 0 ? (
-                  <div className="bottom-ad-badge">{bottomAd2Sec}</div>
-                ) : (
-                  <button className="bottom-ad-badge bottom-ad-close" onClick={handleBottomAd2Close} aria-label="বন্ধ করুন">✕</button>
-                )}
-              </div>
-            )}
             </div>
 
             {/* কমপ্যাক্ট, ফুল সাদা তিনটা বাটন এক লাইনে: ডাউনলোড, লাইক, শেয়ার */}
@@ -1207,11 +802,6 @@ atOptions = {
               </div>
             )}
 
-            {/* 300x250 Banner Ad - below player, above related */}
-            <div style={{display:'flex',justifyContent:'center',margin:'1rem 0'}}>
-              <div className="ad-banner-slot" id="ad-banner-mid"></div>
-            </div>
-
             {/* ── লেটেস্ট ভিডিও: মাঝের ব্যানার অ্যাডের ঠিক নিচে, Related Videos-এর
                  আলাদা, সাইটের সবচেয়ে নতুন ভিডিওগুলো — ভিডিও বদলালে এটাও বদলে যায় ── */}
             {latestVideos.length > 0 && (
@@ -1219,7 +809,7 @@ atOptions = {
                 <div className="related-section-title">Latest Videos</div>
                 <div className="related-list">
                   {latestVideos.map(v => (
-                    <a key={v.id} className="related-card" href={`/video/${v.slug}`} onClick={e => handleRelatedClick(e, v.slug)}>
+                    <a key={v.id} className="related-card" href={`/video/${v.slug}`}>
                       <div className="related-thumb">
                         <img
                           src={adaptiveThumb(v.thumbnail, 400)}
@@ -1262,7 +852,7 @@ atOptions = {
                 {initialRelated.length === 0 ? (
                   <p style={{ color: 'var(--muted)' }}>No related videos</p>
                 ) : initialRelated.map(v => (
-                  <a key={v.id} className="related-card" href={`/video/${v.slug}`} onClick={e => handleRelatedClick(e, v.slug)}>
+                  <a key={v.id} className="related-card" href={`/video/${v.slug}`}>
                     <div className="related-thumb">
                       <img
                         src={adaptiveThumb(v.thumbnail, 400)}
@@ -1304,7 +894,7 @@ atOptions = {
               {initialRelated.length === 0 ? (
                 <p style={{ color: 'var(--muted)' }}>No related videos</p>
               ) : initialRelated.map(v => (
-                <a key={v.id} className="related-card" href={`/video/${v.slug}`} onClick={e => handleRelatedClick(e, v.slug)}>
+                <a key={v.id} className="related-card" href={`/video/${v.slug}`}>
                   <div className="related-thumb">
                     <img
                       src={adaptiveThumb(v.thumbnail, 400)}
@@ -1339,15 +929,13 @@ atOptions = {
           </div>
         </div>
 
-        <div id="container-e474628fdcec06f52100e0b84b3fa759"></div>
-
         {/* ── Infinite scroll: ইউজার স্ক্রল করলে ধীরে ধীরে
              আরও related videos লোড হয়ে এখানে দেখানো হবে ── */}
         {extraRelated.length > 0 && (
           <>
             <div className="related-list">
               {extraRelated.map(v => (
-                <a key={v.id} className="related-card" href={`/video/${v.slug}`} onClick={e => handleRelatedClick(e, v.slug)}>
+                <a key={v.id} className="related-card" href={`/video/${v.slug}`}>
                   <div className="related-thumb">
                     <img
                       src={adaptiveThumb(v.thumbnail, 400)}
@@ -1389,15 +977,6 @@ atOptions = {
           <div ref={loadMoreRef} style={{ height: '40px' }}></div>
         )}
 
-        {/* ── ৪০টা (বা যত আছে) related ভিডিও লোড শেষ হলে, সবার নিচে
-             ওপরের ব্যানার এডের একটা কপি আবার বসানো হচ্ছে। ── */}
-        {/* ── শেষের ওভারলে: সব related ভিডিও লোড শেষ হলে লিস্টের একদম শেষে বসে ── */}
-        {!hasMoreToLoad && <InlineAdOverlay urls={END_AD_URLS} resetKey={video.id} seconds={3} />}
-
-        {!hasMoreToLoad && (
-          <div style={{display:'flex',justifyContent:'center',margin:'1rem 0'}} id="native-banner-related-bottom"></div>
-        )}
-
         {/* ── SEO: পেজের একদম নিচে ভাইরাল ভিডিও সম্পর্কিত টেক্সট — সার্চ
              ইঞ্জিনকে পেজের বিষয়বস্তু বুঝতে সাহায্য করে (হোমপেজের ফুটারের মতোই) ── */}
         <div className="video-seo-footer">
@@ -1407,4 +986,4 @@ atOptions = {
       </div>
     </>
   );
-}
+  }
