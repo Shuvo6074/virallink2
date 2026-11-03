@@ -5,10 +5,6 @@ import { getSheetRows } from "../lib/sheetData";
 const SHEET_ID = '1CJU7TtQAvLGwVIrFB4G6uIyDy0m0Uz54kB6ZBpar4zE';
 const PER_PAGE = 30;
 
-// ── ভিডিও কার্ডে ক্লিক করলেই এই SmartLink নতুন ট্যাবে খুলবে (প্রতি ক্লিকেই,
-// কোনো frequency cap ছাড়া) — লিংক বদলাতে হলে শুধু এই ভ্যারিয়েবলটা বদলালেই হবে ──
-const SMARTLINK_URL = 'https://certainlywhen.com?9uS9F=1731612';
-
 function slugify(text) {
   return text.toString().toLowerCase()
     .replace(/\s+/g, '-')
@@ -132,16 +128,7 @@ function getUniqueSlugs(rows, slugifyFn) {
 }
 
 export async function getServerSideProps({ res: httpRes }) {
-  // ── পারফরম্যান্স ফিক্স: পেজটা Vercel-এর Edge-এ ৬০ সেকেন্ডের জন্য cache
-  // হবে। এই সময়ের মধ্যে আসা সব ভিজিটর সরাসরি cached, দ্রুত পেজ পাবে —
-  // প্রতিবার নতুন করে Google Sheets fetch করতে হবে না। ডেটা বদলালে
-  // (নতুন ভিডিও যোগ হলে) সর্বোচ্চ ৬০ সেকেন্ড দেরিতে দেখাবে, এটা নিয়ে
-  // চিন্তার কিছু নেই — বাকি সব লজিক আগের মতোই অপরিবর্তিত। ──
-  // ── রিকোয়েস্ট কমানোর ফিক্স: 60s থেকে বাড়িয়ে 900s (15 মিনিট) করা হলো।
-  // stale-while-revalidate মানে এই সময়ের মধ্যেও কেউ নতুন ভিডিও পাবলিশ
-  // করলে পুরনো (stale) কপি সাথে সাথেই serve হবে, ব্যাকগ্রাউন্ডে নতুন
-  // ভার্সন fetch হয়ে যাবে — ইউজার কখনো লোডিং wait করবে না, শুধু নতুন
-  // ভিডিও দেখা যেতে সর্বোচ্চ ১৫ মিনিট দেরি হতে পারে। ──
+  // ── রিকোয়েস্ট কমানোর ফিক্স: 900s (15 মিনিট) cache + stale-while-revalidate ──
   httpRes.setHeader('Cache-Control', 'public, s-maxage=900, stale-while-revalidate=1800');
 
   try {
@@ -179,18 +166,6 @@ export default function Home({ initialVideos }) {
   // প্রথমে (server-render + client-এর প্রথম paint) সবসময় 'normal' থাকে যাতে
   // hydration mismatch না হয়; mount হওয়ার পর আসল অবস্থা জানা গেলে state বদলায়। ──
   const [netTier, setNetTier] = useState('normal'); // 'slow' | 'normal' | 'fast'
-  // ── হোমপেজের অ্যাড: পেজে প্রথম ক্লিক/ট্যাপ (যেখানেই হোক) শুধু SmartLink নতুন ট্যাবে খুলবে,
-  // সেই ক্লিকের স্বাভাবিক কাজ (ভিডিওতে যাওয়া ইত্যাদি) হবে না। দ্বিতীয় ক্লিক থেকে সব স্বাভাবিক। ──
-  useEffect(() => {
-    function onFirstClick(e) {
-      document.removeEventListener('click', onFirstClick, true);
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      window.open(SMARTLINK_URL, '_blank');
-    }
-    document.addEventListener('click', onFirstClick, true);
-    return () => document.removeEventListener('click', onFirstClick, true);
-  }, []);
 
   useEffect(() => {
     try {
@@ -219,8 +194,7 @@ export default function Home({ initialVideos }) {
   };
 
   useEffect(() => {
-    // ── ভিউ কাউন্ট (নতুন সিস্টেম): এখন Google Sheets-এর বদলে Cloudflare D1
-    // database থেকে সব ভিডিওর ভিউ কাউন্ট একসাথে fetch করা হচ্ছে ──
+    // ── ভিউ কাউন্ট: Cloudflare D1 database থেকে সব ভিডিওর ভিউ কাউন্ট একসাথে fetch ──
     fetch('/api/get-views')
       .then(res => res.json())
       .then(counts => setViews(counts))
