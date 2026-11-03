@@ -19,6 +19,7 @@ export default function Document() {
         <meta name="6a97888e-site-verification" content="c467fb8cea7003a194330a267add6ff7" />
         <meta name="eroads_" content="473f327f654433a95a24752e9a824390" />
         <meta name="monetag" content="ab2571bbfb46509a76cb5469a2845e0c" />
+        <meta name="admaven-placement" content="BpjaHrHg4" />
         <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
         <meta name="googlebot" content="index, follow" />
         <meta name="rating" content="adult" />
@@ -35,4 +36,4 @@ export default function Document() {
       </body>
     </Html>
   );
-}
+    }
