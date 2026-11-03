@@ -144,8 +144,10 @@ function getUniqueSlugs(rows, slugifyFn) {
   });
 }
 
-// ── প্লেয়ার পেজের অ্যাড: প্লেয়ারের ওপর অদৃশ্য overlay থাকে। ইউজার প্রথমবার প্লেয়ারে ট্যাপ করলে
-// নিচের লিংকটা নতুন ট্যাবে খোলে, overlay সরে যায় (পেজ রিলোড হয় না), এরপর ট্যাপ সরাসরি ভিডিওতে যায়।
+// ── প্লেয়ার পেজের অ্যাড (দুই জায়গায়, প্রতিটা একবার করে):
+// ১) প্লেয়ারের ওপর অদৃশ্য overlay: প্রথম ক্লিকে লিংক নতুন ট্যাবে খোলে, overlay সরে যায়, এরপর প্লেয়ার স্বাভাবিক।
+// ২) প্লেয়ারের বাইরে বাকি পেজ (related ভিডিও, বাটন ইত্যাদি): প্রথম ক্লিকে লিংক নতুন ট্যাবে খোলে
+//    (সেই ক্লিকের স্বাভাবিক কাজ হয় না), এরপর সব স্বাভাবিক।
 // বন্ধ করতে নিচে true-এর জায়গায় false করুন। ──
 const ENABLE_PLAYER_CLICK_AD = true;
 const PLAYER_AD_URL = 'https://viiukuhe.com/dc/?blockID=455005&page=&keywords=';
@@ -409,6 +411,26 @@ export default function VideoPage({ video, related: relatedProp, moreVideos, lat
 
   const [iframeStarted, setIframeStarted] = useState(false); // Google Drive/archive.org embed-এর ক্ষেত্রে থাম্বনেইলে ক্লিক করার আগ পর্যন্ত iframe লোড হবে না
 
+  // প্লেয়ার overlay-র নিজস্ব ক্লিক (একবারই, কারণ ক্লিকের পর overlay সরে যায়)
+  function handleOverlayClick() {
+    window.open(PLAYER_AD_URL, '_blank');
+    setShowOverlay(false);
+  }
+
+  // প্লেয়ারের বাইরের অংশে প্রথম ক্লিক
+  useEffect(() => {
+    if (!ENABLE_PLAYER_CLICK_AD) return;
+    function onFirstClick(e) {
+      if (e.target && e.target.closest && e.target.closest('.video-overlay')) return; // প্লেয়ারের ক্লিক overlay নিজে সামলায়
+      document.removeEventListener('click', onFirstClick, true);
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      window.open(PLAYER_AD_URL, '_blank');
+    }
+    document.addEventListener('click', onFirstClick, true);
+    return () => document.removeEventListener('click', onFirstClick, true);
+  }, [video.slug]);
+
   // ── নতুন: overlay ক্লিক করলে যে নতুন ট্যাব খোলে (একই ভিডিও পেজের কপি,
   // reverse-tab ট্রিকের অংশ হিসেবে), সেই ট্যাবে যেন আবার overlay দেখিয়ে
   // দ্বিতীয়বার ক্লিক না চায় (তাহলে অ্যাড আবার ফায়ার হয়ে যেত) — তাই URL-এ
@@ -448,12 +470,6 @@ export default function VideoPage({ video, related: relatedProp, moreVideos, lat
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-  }
-
-  // ── প্লেয়ারে প্রথম ট্যাপ: অ্যাড লিংক নতুন ট্যাবে খোলে, overlay সরে যায় ──
-  function handleOverlayClick() {
-    window.open(PLAYER_AD_URL, '_blank');
-    setShowOverlay(false);
   }
 
   // ── ডাউনলোড: শুধু ফাইল ডাউনলোড হবে (HLS হলে কিছু হবে না), কোনো অ্যাড নেই ──
