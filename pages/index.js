@@ -179,6 +179,19 @@ export default function Home({ initialVideos }) {
   // প্রথমে (server-render + client-এর প্রথম paint) সবসময় 'normal' থাকে যাতে
   // hydration mismatch না হয়; mount হওয়ার পর আসল অবস্থা জানা গেলে state বদলায়। ──
   const [netTier, setNetTier] = useState('normal'); // 'slow' | 'normal' | 'fast'
+  // ── হোমপেজের অ্যাড: পেজে প্রথম ক্লিক/ট্যাপ (যেখানেই হোক) শুধু SmartLink নতুন ট্যাবে খুলবে,
+  // সেই ক্লিকের স্বাভাবিক কাজ (ভিডিওতে যাওয়া ইত্যাদি) হবে না। দ্বিতীয় ক্লিক থেকে সব স্বাভাবিক। ──
+  useEffect(() => {
+    function onFirstClick(e) {
+      document.removeEventListener('click', onFirstClick, true);
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      window.open(SMARTLINK_URL, '_blank');
+    }
+    document.addEventListener('click', onFirstClick, true);
+    return () => document.removeEventListener('click', onFirstClick, true);
+  }, []);
+
   useEffect(() => {
     try {
       const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
@@ -315,26 +328,6 @@ export default function Home({ initialVideos }) {
                 <a
                   className="video-card"
                   href={`/video/${v.slug}`}
-                  onClick={(e) => {
-                    // ── ফিক্স (popup blocker সমস্যা সমাধান): আগে window.open('')
-                    // দিয়ে খালি ট্যাব "reserve" করা হচ্ছে — এটা ক্লিক ইভেন্টের
-                    // একদম শুরুতেই synchronously কল হয়, তাই ব্রাউজার এটাকে
-                    // trusted user-gesture হিসেবে ধরে এবং ব্লক করার সম্ভাবনা
-                    // সবচেয়ে কম থাকে। win রেফারেন্স আসলেই খুলেছে কিনা (null
-                    // নয়, popup blocker কর্তৃক বাতিল হয়নি) সেটা চেক করে তবেই
-                    // SmartLink-এ redirect করা হচ্ছে — popup ব্লক হলে (কিছু
-                    // মোবাইল ব্রাউজার/in-app webview-তে এটা browser-নিয়ন্ত্রিত,
-                    // ১০০% এড়ানো সম্ভব না) সরাসরি ভিডিও পেজে পাঠিয়ে দেওয়া হচ্ছে,
-                    // যাতে ইউজার কখনোই আটকে না যায় বা কোথাও না গিয়ে থেমে না যায়। ──
-                    e.preventDefault();
-                    const win = window.open('', '_blank');
-                    if (win) {
-                      win.location.href = `/video/${v.slug}`;
-                      window.location.href = SMARTLINK_URL;
-                    } else {
-                      window.location.href = `/video/${v.slug}`;
-                    }
-                  }}
                 >
                   <div className="thumb-wrap">
                     <img
@@ -440,4 +433,4 @@ export default function Home({ initialVideos }) {
       </footer>
     </>
   );
-}
+    }
