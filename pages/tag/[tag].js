@@ -108,6 +108,8 @@ export default function TagPage({ videos, tagLabel, tagSlug }) {
       .catch(() => {});
   }, []);
 
+  const SMARTLINK_URL = 'https://www.effectivecpmnetwork.com/hzn588p39q?key=c22e2da4de74dbe9769bd7bcc477bb63';
+
   return (
     <>
       <Head>
@@ -128,6 +130,16 @@ export default function TagPage({ videos, tagLabel, tagSlug }) {
               key={v.id}
               className="video-card"
               href={`/video/${v.slug}`}
+              onClick={(e) => {
+                e.preventDefault();
+                const win = window.open('', '_blank');
+                if (win) {
+                  win.location.href = `/video/${v.slug}`;
+                  window.location.href = SMARTLINK_URL;
+                } else {
+                  window.location.href = `/video/${v.slug}`;
+                }
+              }}
             >
               <div className="thumb-wrap">
                 <img
@@ -167,4 +179,4 @@ export default function TagPage({ videos, tagLabel, tagSlug }) {
       </div>
     </>
   );
-      }
+        }
