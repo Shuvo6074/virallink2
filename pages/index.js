@@ -268,6 +268,7 @@ export default function Home({ initialVideos }) {
           "url":"https://virallink2.site","description":"বাংলাদেশের ভাইরাল ভিডিও নেটওয়ার্ক",
           "potentialAction":{"@type":"SearchAction","target":"https://virallink2.site/search?q={search_term_string}","query-input":"required name=search_term_string"}
         })}} />
+        <script data-cfasync="false" src="https://aarems.org/1/e11add4186ad924a2c35518025bbb7c2"></script>
       </Head>
 
       <header>
